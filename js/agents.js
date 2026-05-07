@@ -257,6 +257,170 @@ cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
 🤖 本报告由 AI Sight 执行 Agent 生成（模拟模式）
 后续接入 MiMo API 后可替换为真实 AI 推理。`;
   }
+  // ===== 提示词解析器 =====
+  analyzePrompt(promptText) {
+    const text = promptText.trim();
+    if (!text) return null;
+
+    // 检测提示词类型
+    const toolType = this.detectPromptType(text);
+    const analysis = this.analyzeByType(text, toolType);
+    const score = this.calculateScore(analysis);
+    const suggestions = this.generateSuggestions(text, toolType, analysis);
+
+    return {
+      toolType: toolType,
+      score: score,
+      analysis: analysis,
+      suggestions: suggestions,
+      improved: this.generateImprovedVersion(text, toolType, analysis)
+    };
+  },
+
+  // 检测提示词所属工具类型
+  detectPromptType(text) {
+    if (/--ar\s|-\-v\s|-\-s\s|-\-c\s|-\-style\s/i.test(text)) return 'midjourney';
+    if (/\[Camera\]|\[Duration\]|\[Visual\]|\[Lighting\]/i.test(text)) return 'kling';
+    if (/\[Genre\]|\[Mood\]|\[Tempo\]|BPM/i.test(text)) return 'suno';
+    if (/midjourney|mj\s|image\s+prompt/i.test(text.toLowerCase())) return 'midjourney';
+    if (/kling|video\s+prompt/i.test(text.toLowerCase())) return 'kling';
+    if (/suno|music\s+prompt/i.test(text.toLowerCase())) return 'suno';
+    return 'generic';
+  },
+
+  // 按类型分析
+  analyzeByType(text, type) {
+    const result = { strengths: [], weaknesses: [], missing: [] };
+
+    if (type === 'midjourney' || type === 'generic') {
+      // MJ 提示词分析
+      result.hasSubject = text.length > 10;
+      result.hasStyle = /\b(cinematic|photorealistic|surreal|abstract|oil painting|anime|3d render)/i.test(text);
+      result.hasLighting = /\b(lighting|rim light|volumetric|glow|shadow|chiaroscuro)/i.test(text);
+      result.hasCamera = /\b(close-up|wide angle|overhead|aerial|fisheye|macro)/i.test(text);
+      result.hasParams = /--ar\s+\d+:\d+/.test(text);
+      result.hasVersion = /--v\s+\d+/.test(text) || /--style\s+raw/.test(text);
+      result.hasQuality = /\b(8k|4k|hd|high quality|detailed)/i.test(text);
+      result.wordCount = text.split(/\s+/).length;
+      result.hasNegative = /\b(not|no|without|avoid|-\-no)/i.test(text);
+    }
+
+    if (type === 'kling' || type === 'generic') {
+      result.hasCameraTag = /\[Camera\]/i.test(text);
+      result.hasDurationTag = /\[Duration\]/i.test(text);
+      result.hasVisualTag = /\[Visual\]/i.test(text);
+      result.hasStyleTag = /\[Style\]/i.test(text);
+      result.hasLightingTag = /\[Lighting\]/i.test(text);
+      if (result.hasDurationTag) {
+        const durMatch = text.match(/(\d+)\s*s/);
+        result.durationValue = durMatch ? parseInt(durMatch[1]) : 0;
+      }
+    }
+
+    if (type === 'suno' || type === 'generic') {
+      result.hasGenreTag = /\[Genre\]/i.test(text);
+      result.hasMoodTag = /\[Mood\]/i.test(text);
+      result.hasInstrumentTag = /\[Instrument\]/i.test(text);
+      result.hasStructureTag = /\[Structure\]|\[Structure\]/i.test(text);
+      result.hasTempoTag = /\[Tempo\]|BPM/i.test(text);
+      if (result.hasTempoTag) {
+        const bpmMatch = text.match(/(\d+)\s*BPM/);
+        result.bpmValue = bpmMatch ? parseInt(bpmMatch[1]) : 0;
+      }
+    }
+
+    return result;
+  },
+
+  // 计算评分（0-100）
+  calculateScore(analysis) {
+    let score = 0;
+    let max = 0;
+
+    const check = (condition, weight) => {
+      max += weight;
+      if (condition) score += weight;
+    };
+
+    check(analysis.hasSubject, 15);
+    check(analysis.hasStyle, 15);
+    check(analysis.hasLighting, 10);
+    check(analysis.hasCamera, 10);
+    check(analysis.hasParams, 15);
+    check(analysis.hasVersion, 10);
+    check(analysis.hasQuality, 10);
+    check(analysis.wordCount > 15, 10);
+    check(analysis.wordCount < 80, 5); // 不要太长
+
+    // Kling 专属
+    check(analysis.hasCameraTag, 10);
+    check(analysis.hasDurationTag, 10);
+    check(analysis.hasVisualTag, 10);
+    check(analysis.hasStyleTag, 10);
+
+    // Suno 专属
+    check(analysis.hasGenreTag, 10);
+    check(analysis.hasMoodTag, 10);
+    check(analysis.hasStructureTag, 10);
+    check(analysis.hasTempoTag, 10);
+
+    return Math.min(100, Math.round((score / Math.max(max, 1)) * 100));
+  },
+
+  // 生成改进建议
+  generateSuggestions(text, type, analysis) {
+    const suggestions = [];
+
+    if (type === 'midjourney' || type === 'generic') {
+      if (!analysis.hasStyle) suggestions.push('缺少风格描述（如 cinematic、photorealistic、anime 等），建议添加');
+      if (!analysis.hasLighting) suggestions.push('缺少光照描述（如 volumetric lighting、rim light），添加后可提升画面质感');
+      if (!analysis.hasParams) suggestions.push('建议添加 --ar 16:9 指定宽高比，这是 MJ 最佳实践的必要参数');
+      if (!analysis.hasVersion) suggestions.push('建议添加 --v 6 或 --style raw 以使用最新模型');
+      if (analysis.wordCount < 10) suggestions.push('提示词过短，建议详细描述主体、环境、风格、光照');
+      if (analysis.wordCount > 80) suggestions.push('提示词过长，MJ 对超长提示词的效果会递减，建议精简到 60 词以内');
+      if (!analysis.hasQuality) suggestions.push('建议添加质量关键词（8k、highly detailed、sharp focus）');
+    }
+
+    if (type === 'kling' || type === 'generic') {
+      if (!analysis.hasCameraTag) suggestions.push('缺少 [Camera] 标签，Kling 强烈依赖镜头描述，建议添加');
+      if (!analysis.hasDurationTag) suggestions.push('缺少 [Duration] 标签，建议明确视频时长（如 5s、10s）');
+      if (!analysis.hasVisualTag) suggestions.push('缺少 [Visual] 标签，建议描述核心画面内容');
+      if (analysis.durationValue && analysis.durationValue > 15) suggestions.push('Kling 单段视频建议 ≤10s，过长会导致质量下降');
+    }
+
+    if (type === 'suno' || type === 'generic') {
+      if (!analysis.hasGenreTag) suggestions.push('缺少 [Genre] 标签，Suno 需要明确音乐类型');
+      if (!analysis.hasMoodTag) suggestions.push('缺少 [Mood] 标签，建议描述情绪氛围');
+      if (!analysis.hasStructureTag) suggestions.push('缺少 [Structure] 标签，建议描述歌曲结构（如前奏-主歌-副歌）');
+      if (analysis.bpmValue && (analysis.bpmValue < 60 || analysis.bpmValue > 180)) suggestions.push('BPM 值建议设在 70-160 之间，超出范围可能导致生成失败');
+    }
+
+    if (suggestions.length === 0) suggestions.push('提示词结构完整，无明显缺陷！可尝试添加更多细节描述以提升独特性。');
+    return suggestions;
+  },
+
+  // 生成改进版提示词
+  generateImprovedVersion(text, type, analysis) {
+    let improved = text;
+
+    if (type === 'midjourney') {
+      if (!analysis.hasParams) improved += ' --ar 16:9';
+      if (!analysis.hasVersion) improved += ' --v 6 --style raw';
+      if (!analysis.hasQuality && improved === text) improved = text + ', highly detailed, 8k, sharp focus --ar 16:9 --v 6';
+    }
+
+    if (type === 'kling') {
+      if (!analysis.hasCameraTag) improved = '[Camera] Medium shot, smooth movement\n' + improved;
+      if (!analysis.hasDurationTag) improved = improved.replace('[Visual]', '[Duration] 6 seconds\n[Visual]');
+    }
+
+    if (type === 'suno') {
+      if (!analysis.hasGenreTag) improved = '[Genre] Cinematic Orchestral\n' + improved;
+      if (!analysis.hasMoodTag) improved = improved.replace('[Instrument]', '[Mood] Epic, emotional\n[Instrument]');
+    }
+
+    return improved === text ? null : improved;
+  }
 };
 
 // 导出

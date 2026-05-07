@@ -16,34 +16,54 @@
     </div>
     <div class="header-actions">
       <button class="btn btn-ghost" id="btn-howitworks">工作原理</button>
-      <button class="btn btn-ghost" id="btn-apply">申请 MiMo 100T</button>
     </div>
   </header>
 
   <main class="main">
-    <!-- 左侧：需求输入面板 -->
+    <!-- 左侧：输入面板 -->
     <section class="panel panel-input">
       <div class="panel-header">
         <h2>📝 创作需求</h2>
         <span class="panel-badge">输入</span>
       </div>
-      <div class="input-area">
-        <textarea id="user-input" placeholder="描述你的创作需求...&#10;&#10;例如：&#10;- 制作一个科幻风格的短视频，主题是地球呼吸&#10;- 生成末日世界观的分镜脚本&#10;- 创建一个神秘氛围的背景音乐"></textarea>
+
+      <!-- 模式切换 -->
+      <div class="mode-switch">
+        <button class="mode-btn active" data-mode="generate">⚡ 生成提示词</button>
+        <button class="mode-btn" data-mode="analyze">🔍 解析提示词</button>
+      </div>
+
+      <!-- 生成模式：需求输入 -->
+      <div class="input-area" id="area-generate">
+        <textarea id="user-input" placeholder="描述你的创作需求...&#10;&#10;例如：&#10;- 制作一个科幻风格的分镜脚本&#10;- 生成末日世界观的设定文案"></textarea>
         <div class="input-tips">
           <span class="tip">💡 提示：描述越详细，生成的提示词越精准</span>
         </div>
       </div>
-      <div class="preset-prompts">
+
+      <!-- 解析模式：提示词输入 -->
+      <div class="input-area" id="area-analyze" style="display:none">
+        <textarea id="analyze-input" placeholder="粘贴需要解析的提示词...&#10;&#10;例如：&#10;A cinematic shot of a cyberpunk city, neon lights,&#10;wide angle, 8k, photorealistic --ar 16:9 --v 6"></textarea>
+        <div class="input-tips">
+          <span class="tip">💡 支持 Midjourney / Kling / Suno 等格式的提示词</span>
+        </div>
+      </div>
+
+      <div class="preset-prompts" id="presets-generate">
         <div class="preset-title">🎯 快速示例</div>
         <div class="preset-list">
           <button class="preset-btn" data-prompt="制作一个科幻风格的短视频，主题是地球呼吸，展示地球作为一个生命体的概念">地球呼吸 · 科幻短视频</button>
-          <button class="preset-btn" data-prompt="生成一个丧尸末日世界观的分镜脚本，重点展示感染者与正常人的对视时刻，体现替换者的概念">丧尸末日 · 分镜脚本</button>
-          <button class="preset-btn" data-prompt="创建一组 Minecraft 风格的建筑模组宣传图，展示自定义维度的奇特景观">Minecraft · 维度宣传图</button>
-          <button class="preset-btn" data-prompt="生成一段神秘氛围的背景音乐提示词，适合悬疑解谜游戏的开场">悬疑游戏 · 背景音乐</button>
+          <button class="preset-btn" data-prompt="生成一个丧尸末日世界观的分镜脚本，重点展示感染者与正常人的对视时刻">丧尸末日 · 分镜脚本</button>
+          <button class="preset-btn" data-prompt="创建一组 Minecraft 风格的建筑模组宣传图">Minecraft · 维度宣传图</button>
+          <button class="preset-btn" data-prompt="生成一段神秘氛围的背景音乐提示词">悬疑游戏 · 背景音乐</button>
         </div>
       </div>
+
       <button class="btn btn-primary btn-run" id="btn-run">
         <span class="btn-icon">▶</span> 启动 Agent 协作
+      </button>
+      <button class="btn btn-primary btn-run" id="btn-analyze" style="display:none">
+        <span class="btn-icon">🔍</span> 解析提示词
       </button>
     </section>
 
@@ -145,6 +165,7 @@
         <button class="tab-btn" data-tab="kling">Kling</button>
         <button class="tab-btn" data-tab="suno">Suno</button>
         <button class="tab-btn" data-tab="summary">综合报告</button>
+        <button class="tab-btn" data-tab="analyze">🔍 解析结果</button>
       </div>
       <div class="output-content">
         <div class="tab-panel active" id="tab-mj">
@@ -175,6 +196,16 @@
           </div>
           <div class="summary-content" id="content-summary">等待生成...</div>
         </div>
+        <!-- 解析结果 Tab -->
+        <div class="tab-panel" id="tab-analyze">
+          <div class="prompt-header">
+            <span class="prompt-label">🔍 提示词解析结果</span>
+            <button class="btn-icon" id="copy-analyze" title="复制">📋</button>
+          </div>
+          <div class="analyze-content" id="content-analyze">
+            <div class="analyze-placeholder">在左侧输入提示词并点击「解析提示词」</div>
+          </div>
+        </div>
       </div>
       <div class="output-actions">
         <button class="btn btn-secondary" id="btn-export-all">📦 导出全部提示词</button>
@@ -188,36 +219,6 @@
     <span class="footer-status" id="footer-status">就绪 · 等待输入</span>
     <span class="footer-info">AI Sight v1.0 · 纯前端 · 零 API 成本</span>
   </footer>
-
-  <!-- 申请说明弹窗 -->
-  <div class="modal-overlay" id="modal-apply" style="display:none">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>📋 申请 MiMo 100T 激励计划</h3>
-        <button class="modal-close" id="modal-close-apply">×</button>
-      </div>
-      <div class="modal-body">
-        <h4>项目描述（直接复制至申请表单）</h4>
-        <div class="apply-section">
-          <label>项目名称</label>
-          <div class="apply-content" id="apply-name">AI Sight — 多 Agent 提示词工程工作台</div>
-        </div>
-        <div class="apply-section">
-          <label>项目解决的核心痛点</label>
-          <div class="apply-content" id="apply-pain">AI 创作者在多模型协作（Midjourney + Kling + Suno 等）中面临提示词管理混乱、版本迭代困难、跨工具提示词适配成本高的痛点。现有工具多为单一模型优化，缺乏系统化的提示词工程工作流。</div>
-        </div>
-        <div class="apply-section">
-          <label>核心逻辑流（长链推理 / 多 Agent 协作）</label>
-          <div class="apply-content" id="apply-logic">项目采用三 Agent 协作架构：理解 Agent 负责解析用户创作需求并拆解为结构化任务；生成 Agent 针对每个 AI 工具的特性生成专用提示词，支持多版本迭代优化；执行 Agent 模拟完整工具链调用流程并可视化展示。三个 Agent 通过共享上下文实现长链推理，用户输入一个创作需求，系统自动完成需求理解 → 提示词生成 → 工作流模拟的全链路处理。</div>
-        </div>
-        <div class="apply-section">
-          <label>实际效果（落地情况、数据）</label>
-          <div class="apply-content" id="apply-result">项目采用纯前端架构，零 API 成本即可运行，已内置多组典型创作场景的完整输出示例。后续可无缝接入 MiMo API 替换模拟推理，实现真实 AI 驱动。项目可直接演示多 Agent 协作的完整工作流，适合作为 Agent 生态建设的参考案例。</div>
-        </div>
-        <button class="btn btn-primary" id="copy-apply-all">📋 复制全部申请文案</button>
-      </div>
-    </div>
-  </div>
 
   <!-- 工作原理弹窗 -->
   <div class="modal-overlay" id="modal-how" style="display:none">
@@ -238,7 +239,7 @@
           <div class="how-step-num">2</div>
           <div class="how-step-content">
             <h4>生成 Agent</h4>
-            <p>根据任务单元，针对每个 AI 工具（Midjourney / Kling / Suno）的特性，生成专用提示词，支持 A/B 版本对比。</p>
+            <p>根据任务单元，针对每个 AI 工具（Midjourney / Kling / Suno）的特性，生成专用提示词，支持多版本对比。</p>
           </div>
         </div>
         <div class="how-step">
@@ -249,7 +250,7 @@
           </div>
         </div>
         <div class="how-note">
-          <p>💡 当前版本使用模拟数据展示工作流程。申请通过并获得 MiMo API KEY 后，将替换为真实 AI 推理。</p>
+          <p>💡 AI Sight 为纯前端工具，零 API 成本，所有分析均在浏览器本地完成。</p>
         </div>
       </div>
     </div>

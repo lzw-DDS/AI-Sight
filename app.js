@@ -6,12 +6,21 @@
 
   // ===== DOM 元素 =====
   const dom = {
-    input: document.getElementById('user-input'),
+    // 模式切换
+    modeBtns: document.querySelectorAll('.mode-btn'),
+    // 生成模式
+    areaGenerate: document.getElementById('area-generate'),
+    presetsGenerate: document.getElementById('presets-generate'),
     btnRun: document.getElementById('btn-run'),
-    presetBtns: document.querySelectorAll('.preset-btn'),
+    userInput: document.getElementById('user-input'),
+    // 解析模式
+    areaAnalyze: document.getElementById('area-analyze'),
+    btnAnalyze: document.getElementById('btn-analyze'),
+    analyzeInput: document.getElementById('analyze-input'),
+    // Tab 切换
     tabBtns: document.querySelectorAll('.tab-btn'),
     panels: document.querySelectorAll('.tab-panel'),
-    // 输出区域
+    // 输出区域（Agent 流程）
     contentUnderstand: document.getElementById('content-understand'),
     contentGenerate: document.getElementById('content-generate'),
     contentExecute: document.getElementById('content-execute'),
@@ -20,79 +29,89 @@
     promptKling: document.getElementById('prompt-kling'),
     promptSuno: document.getElementById('prompt-suno'),
     contentSummary: document.getElementById('content-summary'),
+    // 解析结果
+    contentAnalyze: document.getElementById('content-analyze'),
+    copyAnalyze: document.getElementById('copy-analyze'),
     // 底部状态
     footerStatus: document.getElementById('footer-status'),
     // 弹窗
-    modalApply: document.getElementById('modal-apply'),
     modalHow: document.getElementById('modal-how'),
-    btnApply: document.getElementById('btn-apply'),
     btnHow: document.getElementById('btn-howitworks'),
-    modalCloseApply: document.getElementById('modal-close-apply'),
     modalCloseHow: document.getElementById('modal-close-how'),
     // 复制按钮
     copyMj: document.getElementById('copy-mj'),
     copyKling: document.getElementById('copy-kling'),
     copySuno: document.getElementById('copy-suno'),
     copySummary: document.getElementById('copy-summary'),
-    copyApplyAll: document.getElementById('copy-apply-all'),
     // 操作按钮
     btnExportAll: document.getElementById('btn-export-all'),
     btnReset: document.getElementById('btn-reset'),
   };
 
+  // ===== 当前模式 =====
+  let currentMode = 'generate'; // 'generate' | 'analyze'
+
   // ===== 状态 =====
-  let currentData = null; // 存储当前生成结果
+  let currentData = null;
   let isRunning = false;
+
+  // ===== 模式切换 =====
+  function switchMode(mode) {
+    currentMode = mode;
+    dom.modeBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+    });
+    const isGenerate = mode === 'generate';
+    dom.areaGenerate.style.display = isGenerate ? '' : 'none';
+    dom.presetsGenerate.style.display = isGenerate ? '' : 'none';
+    dom.btnRun.style.display = isGenerate ? '' : 'none';
+    dom.areaAnalyze.style.display = isGenerate ? 'none' : '';
+    dom.btnAnalyze.style.display = isGenerate ? 'none' : '';
+    updateFooter(isGenerate ? '就绪 · 输入创作需求后点击「启动 Agent 协作」' : '就绪 · 粘贴提示词后点击「解析提示词」');
+  }
 
   // ===== 初始化 =====
   function init() {
-    // 绑定启动按钮
+    // 模式切换
+    dom.modeBtns.forEach(btn => {
+      btn.addEventListener('click', () => switchMode(btn.getAttribute('data-mode')));
+    });
+
+    // 生成模式：启动按钮
     dom.btnRun.addEventListener('click', startFlow);
 
-    // 绑定示例按钮
-    dom.presetBtns.forEach(btn => {
+    // 解析模式：解析按钮
+    dom.btnAnalyze.addEventListener('click', startAnalyze);
+
+    // 示例按钮（仅生成模式）
+    document.querySelectorAll('.preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        dom.input.value = btn.getAttribute('data-prompt');
+        dom.userInput.value = btn.getAttribute('data-prompt');
+        switchMode('generate');
         startFlow();
       });
     });
 
-    // 绑定 Tab 切换
+    // Tab 切换
     dom.tabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         switchTab(btn.getAttribute('data-tab'));
       });
     });
 
-    // 绑定弹窗
-    dom.btnApply.addEventListener('click', () => {
-      dom.modalApply.style.display = 'flex';
-    });
-    dom.btnHow.addEventListener('click', () => {
-      dom.modalHow.style.display = 'flex';
-    });
-    dom.modalCloseApply.addEventListener('click', () => {
-      dom.modalApply.style.display = 'none';
-    });
-    dom.modalCloseHow.addEventListener('click', () => {
-      dom.modalHow.style.display = 'none';
-    });
+    // 工作原理弹窗
+    dom.btnHow.addEventListener('click', () => { dom.modalHow.style.display = 'flex'; });
+    dom.modalCloseHow.addEventListener('click', () => { dom.modalHow.style.display = 'none'; });
+    dom.modalHow.addEventListener('click', (e) => { if (e.target === dom.modalHow) dom.modalHow.style.display = 'none'; });
 
-    // 点击遮罩关闭弹窗
-    [dom.modalApply, dom.modalHow].forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) modal.style.display = 'none';
-      });
-    });
-
-    // 绑定复制按钮
+    // 复制按钮
     dom.copyMj.addEventListener('click', () => copyText(dom.promptMj.textContent));
     dom.copyKling.addEventListener('click', () => copyText(dom.promptKling.textContent));
     dom.copySuno.addEventListener('click', () => copyText(dom.promptSuno.textContent));
     dom.copySummary.addEventListener('click', () => copyText(dom.contentSummary.textContent));
-    dom.copyApplyAll.addEventListener('click', copyApplyText);
+    dom.copyAnalyze.addEventListener('click', () => copyText(dom.contentAnalyze.textContent));
 
-    // 绑定操作按钮
+    // 操作按钮
     dom.btnExportAll.addEventListener('click', exportAll);
     dom.btnReset.addEventListener('click', resetAll);
 
@@ -101,11 +120,11 @@
 
   // ===== 启动流程 =====
   async function startFlow() {
-    const input = dom.input.value.trim();
+    const input = dom.userInput.value.trim();
     if (!input) {
-      dom.input.focus();
-      dom.input.style.borderColor = '#ef4444';
-      setTimeout(() => dom.input.style.borderColor = '', 1500);
+      dom.userInput.focus();
+      dom.userInput.style.borderColor = '#ef4444';
+      setTimeout(() => dom.userInput.style.borderColor = '', 1500);
       return;
     }
 
@@ -197,6 +216,121 @@
     switchTab('mj');
   }
 
+  // ===== 启动解析流程 =====
+  async function startAnalyze() {
+    const input = dom.analyzeInput.value.trim();
+    if (!input) {
+      dom.analyzeInput.focus();
+      dom.analyzeInput.style.borderColor = '#ef4444';
+      setTimeout(() => dom.analyzeInput.style.borderColor = '', 1500);
+      return;
+    }
+
+    dom.btnAnalyze.disabled = true;
+    dom.btnAnalyze.innerHTML = '<span class="btn-icon">⏳</span> 解析中...';
+    updateFooter('🔍 提示词解析中...');
+
+    // 清空解析结果区域
+    dom.contentAnalyze.innerHTML = '<div class="analyze-placeholder">解析中...</div>';
+
+    // 模拟短暂处理延迟
+    await Animation.sleep(600);
+
+    const result = AgentSimulator.analyzePrompt(input);
+    if (!result) {
+      dom.contentAnalyze.innerHTML = '<div class="analyze-placeholder">解析失败，请检查输入内容</div>';
+      dom.btnAnalyze.disabled = false;
+      dom.btnAnalyze.innerHTML = '<span class="btn-icon">🔍</span> 解析提示词';
+      return;
+    }
+
+    // 渲染解析结果
+    renderAnalyzeResult(result, input);
+
+    dom.btnAnalyze.disabled = false;
+    dom.btnAnalyze.innerHTML = '<span class="btn-icon">🔍</span> 重新解析';
+    updateFooter('✅ 解析完成 · 可查看右侧「解析结果」Tab');
+    switchTab('analyze');
+  }
+
+  // ===== 渲染解析结果 =====
+  function renderAnalyzeResult(result, originalText) {
+    const scoreClass = result.score >= 80 ? 'good' : result.score >= 50 ? 'warn' : 'bad';
+    const toolName = { midjourney: 'Midjourney', kling: 'Kling', suno: 'Suno', generic: '通用' }[result.toolType];
+
+    let html = '';
+
+    // 评分区域
+    html += `<div class="analyze-section">
+      <div class="analyze-section-title">📊 综合评分</div>
+      <div class="analyze-score ${scoreClass}">${result.score}</div>
+      <div class="analyze-bar"><div class="analyze-bar-fill ${scoreClass}" style="width:${result.score}%"></div></div>
+      <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:4px;">检测类型：${toolName} 提示词</div>
+    </div>`;
+
+    // 结构分析
+    html += `<div class="analyze-section">
+      <div class="analyze-section-title">🔬 结构分析</div>`;
+
+    const checks = getAnalysisChecks(result);
+    checks.forEach(c => {
+      html += `<div style="display:flex;align-items:center;gap:6px;margin:4px 0;font-size:12px;">
+        <span class="analyze-tag ${c.pass ? 'good' : 'bad'}">${c.pass ? '✅' : '❌'}</span>
+        <span>${c.label}</span>
+      </div>`;
+    });
+
+    html += `</div>`;
+
+    // 改进建议
+    html += `<div class="analyze-section">
+      <div class="analyze-section-title">💡 改进建议</div>`;
+    result.suggestions.forEach(s => {
+      html += `<div class="analyze-suggestion">${s}</div>`;
+    });
+    html += `</div>`;
+
+    // 改进版提示词
+    if (result.improved) {
+      html += `<div class="analyze-section">
+        <div class="analyze-section-title">✨ 改进版提示词 <button class="btn-icon" onclick="navigator.clipboard.writeText(this.getAttribute('data-imp')).then(()=>this.textContent='✅ 已复制')" data-imp="${escapeForHtml(result.improved)}" style="margin-left:8px;font-size:11px;">📋 复制</button></div>
+        <pre style="background:var(--bg-primary);padding:10px;border-radius:6px;font-size:11px;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${escapeForHtml(result.improved)}</pre>
+      </div>`;
+    }
+
+    dom.contentAnalyze.innerHTML = html;
+  }
+
+  // ===== 获取分析检查项 =====
+  function getAnalysisChecks(result) {
+    const checks = [];
+    if (result.toolType === 'midjourney' || result.toolType === 'generic') {
+      checks.push({ label: '主体描述', pass: result.analysis.hasSubject });
+      checks.push({ label: '风格关键词', pass: result.analysis.hasStyle });
+      checks.push({ label: '光照描述', pass: result.analysis.hasLighting });
+      checks.push({ label: '镜头描述', pass: result.analysis.hasCamera });
+      checks.push({ label: '宽高比参数(--ar)', pass: result.analysis.hasParams });
+      checks.push({ label: '模型版本(--v)', pass: result.analysis.hasVersion });
+    }
+    if (result.toolType === 'kling' || result.toolType === 'generic') {
+      checks.push({ label: '[Camera] 标签', pass: result.analysis.hasCameraTag });
+      checks.push({ label: '[Duration] 标签', pass: result.analysis.hasDurationTag });
+      checks.push({ label: '[Visual] 标签', pass: result.analysis.hasVisualTag });
+      checks.push({ label: '[Style] 标签', pass: result.analysis.hasStyleTag });
+    }
+    if (result.toolType === 'suno' || result.toolType === 'generic') {
+      checks.push({ label: '[Genre] 标签', pass: result.analysis.hasGenreTag });
+      checks.push({ label: '[Mood] 标签', pass: result.analysis.hasMoodTag });
+      checks.push({ label: '[Structure] 标签', pass: result.analysis.hasStructureTag });
+      checks.push({ label: '[Tempo] 标签', pass: result.analysis.hasTempoTag });
+    }
+    return checks;
+  }
+
+  function escapeForHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   // ===== Tab 切换 =====
   function switchTab(tabName) {
     dom.tabBtns.forEach(btn => {
@@ -217,19 +351,22 @@
     dom.promptMj.textContent = '等待生成...';
     dom.promptKling.textContent = '等待生成...';
     dom.promptSuno.textContent = '等待生成...';
-    dom.contentSummary.textContent = '等待生成...';
+    dom.contentSummary.innerHTML = '等待生成...';
+    dom.contentAnalyze.innerHTML = '<div class="analyze-placeholder">在左侧输入提示词并点击「解析提示词」</div>';
   }
 
   // ===== 重置全部 =====
   function resetAll() {
-    dom.input.value = '';
+    dom.userInput.value = '';
+    dom.analyzeInput.value = '';
     resetPanels();
     currentData = null;
     dom.btnRun.innerHTML = '<span class="btn-icon">▶</span> 启动 Agent 协作';
     dom.btnRun.disabled = false;
+    dom.btnAnalyze.innerHTML = '<span class="btn-icon">🔍</span> 解析提示词';
+    dom.btnAnalyze.disabled = false;
     isRunning = false;
-    updateFooter('就绪 · 输入创作需求后点击「启动 Agent 协作」');
-    switchTab('mj');
+    switchMode('generate');
   }
 
   // ===== 复制功能 =====
@@ -247,12 +384,7 @@
       showToast('✅ 已复制到剪贴板');
     });
   }
-
-  function copyApplyText() {
-    const text = `项目名称：AI Sight — 多 Agent 提示词工程工作台\n\n项目解决的核心痛点：\nAI 创作者在多模型协作（Midjourney + Kling + Suno 等）中面临提示词管理混乱、版本迭代困难、跨工具提示词适配成本高的痛点。现有工具多为单一模型优化，缺乏系统化的提示词工程工作流。\n\n核心逻辑流（长链推理 / 多 Agent 协作）：\n项目采用三 Agent 协作架构：理解 Agent 负责解析用户创作需求并拆解为结构化任务；生成 Agent 针对每个 AI 工具的特性生成专用提示词，支持多版本迭代优化；执行 Agent 模拟完整工具链调用流程并可视化展示。三个 Agent 通过共享上下文实现长链推理，用户输入一个创作需求，系统自动完成需求理解 → 提示词生成 → 工作流模拟的全链路处理。\n\n实际效果（落地情况、数据）：\n项目采用纯前端架构，零 API 成本即可运行，已内置多组典型创作场景的完整输出示例。后续可无缝接入 MiMo API 替换模拟推理，实现真实 AI 驱动。项目可直接演示多 Agent 协作的完整工作流，适合作为 Agent 生态建设的参考案例。`;
-    copyText(text);
-  }
-
+  
   // ===== 导出全部提示词 =====
   function exportAll() {
     if (!currentData) {
