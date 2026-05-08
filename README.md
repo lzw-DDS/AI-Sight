@@ -83,6 +83,7 @@
 
 ```
 ├── index.html          # 主界面（4 模式：生成/解析/转换/模板）
+├── setup.html         # AI 配置向导（快速设置 API Key）
 ├── app.js              # 主逻辑 + 社区功能
 ├── css/
 │   └── style.css       # 深色科技感样式

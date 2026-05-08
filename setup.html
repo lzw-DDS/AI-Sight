@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Sight - 快速配置</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #e0e0e0;
+    }
+    .container {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 24px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #a0a0a0;
+    }
+    select, input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+    select:focus, input:focus {
+      border-color: #6366f1;
+    }
+    select option {
+      background: #1a1a2e;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    }
+    .success {
+      display: none;
+      text-align: center;
+      padding: 30px;
+    }
+    .success-icon {
+      font-size: 60px;
+      margin-bottom: 20px;
+    }
+    .success h2 { color: #4ade80; margin-bottom: 10px; }
+    .success p { color: #a0a0a0; }
+    .tips {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(99, 102, 241, 0.1);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #a0a0a0;
+    }
+    .tips a { color: #6366f1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 配置表单 -->
+    <div id="config-form">
+      <h1>⚙️ AI Sight 快速配置</h1>
+      
+      <div class="form-group">
+        <label>AI 提供商</label>
+        <select id="provider">
+          <option value="deepseek" selected>DeepSeek（推荐，免费500万token）</option>
+          <option value="openrouter">OpenRouter（30+免费模型）</option>
+          <option value="openai">OpenAI（官方API）</option>
+          <option value="ollama">Ollama 本地（完全免费）</option>
+        </select>
+      </div>
+      
+      <div class="form-group" id="apikey-group">
+        <label>API Key</label>
+        <input type="password" id="apikey" placeholder="粘贴你的 API Key">
+      </div>
+      
+      <div class="form-group" id="model-group" style="display:none">
+        <label>模型（留空使用默认）</label>
+        <select id="model">
+          <option value="">使用默认模型</option>
+        </select>
+      </div>
+      
+      <button class="btn" id="btn-save">保存配置</button>
+      
+      <div class="tips">
+        <strong>获取 API Key：</strong><br>
+        DeepSeek: <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a><br>
+        OpenRouter: <a href="https://openrouter.ai" target="_blank">openrouter.ai</a>
+      </div>
+    </div>
+    
+    <!-- 成功提示 -->
+    <div class="success" id="success">
+      <div class="success-icon">✅</div>
+      <h2>配置成功！</h2>
+      <p>现在打开 AI Sight 即可使用 AI 增强模式</p>
+    </div>
+  </div>
+
+  <script>
+    const models = {
+      deepseek: [
+        { value: '', text: 'DeepSeek Chat（默认）' },
+        { value: 'deepseek-chat', text: 'DeepSeek Chat' },
+        { value: 'deepseek-reasoner', text: 'DeepSeek Reasoner（推理）' }
+      ],
+      openrouter: [
+        { value: '', text: '自动选择（推荐）' },
+        { value: 'openrouter/auto', text: 'openrouter/auto' },
+        { value: 'qwen/qwen3.5-32b', text: 'Qwen 3.5 32B（免费）' },
+        { value: 'anthropic/claude-3-haiku', text: 'Claude 3 Haiku（免费）' }
+      ],
+      openai: [
+        { value: '', text: 'GPT-4o Mini（默认）' },
+        { value: 'gpt-4o-mini', text: 'GPT-4o Mini' },
+        { value: 'gpt-4o', text: 'GPT-4o' }
+      ],
+      ollama: [
+        { value: '', text: 'qwen3:4b（默认）' },
+        { value: 'llama3', text: 'Llama 3' },
+        { value: 'qwen3', text: 'Qwen 3' },
+        { value: 'qwen2.5:1.5b', text: 'Qwen 2.5 1.5B' }
+      ]
+    };
+
+    const $provider = document.getElementById('provider');
+    const $model = document.getElementById('model');
+    const $modelGroup = document.getElementById('model-group');
+    const $apikeyGroup = document.getElementById('apikey-group');
+
+    // 更新模型列表
+    $provider.onchange = () => {
+      const provider = $provider.value;
+      $model.innerHTML = '';
+      models[provider].forEach(m => {
+        $model.innerHTML += `<option value="${m.value}">${m.text}</option>`;
+      });
+      $modelGroup.style.display = provider === 'ollama' ? 'none' : 'block';
+      $apikeyGroup.style.display = provider === 'ollama' ? 'none' : 'block';
+    };
+    $provider.onchange();
+
+    // 保存配置
+    document.getElementById('btn-save').onclick = () => {
+      const provider = $provider.value;
+      const apikey = document.getElementById('apikey').value;
+      const model = $model.value;
+
+      if (provider !== 'ollama' && !apikey) {
+        alert('请输入 API Key');
+        return;
+      }
+
+      const config = {
+        enabled: true,
+        provider: provider,
+        apiKey: apikey,
+        model: model
+      };
+
+      localStorage.setItem('ai-sight-provider', JSON.stringify(config));
+
+      document.getElementById('config-form').style.display = 'none';
+      document.getElementById('success').style.display = 'block';
+
+      // 3秒后自动跳转到 AI Sight 主页
+      setTimeout(() => {
+        window.opener?.location.reload();
+        window.close();
+      }, 2000);
+    };
+  </script>
+</body>
+</html>

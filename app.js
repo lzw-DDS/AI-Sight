@@ -382,11 +382,18 @@
     const btnSaveSettings = document.getElementById('btn-save-settings');
     const guideToggle = document.getElementById('guide-toggle');
     const guideContent = document.getElementById('guide-content');
+    const btnQuickSetup = document.getElementById('btn-quick-setup');
 
     // 打开设置弹窗
     btnSettings.addEventListener('click', () => {
       loadSettingsUI();
       modalSettings.style.display = 'flex';
+    });
+
+    // 快速配置入口
+    btnQuickSetup?.addEventListener('click', () => {
+      modalSettings.style.display = 'none';
+      window.location.href = 'setup.html';
     });
 
     // 关闭设置弹窗
