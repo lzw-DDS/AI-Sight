@@ -255,8 +255,9 @@ cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
 
 ═════════════════════════════
 🤖 本报告由 AI Sight 执行 Agent 生成（模拟模式）
-后续接入 MiMo API 后可替换为真实 AI 推理。`;
-  }
+后续接入 MiMo API 后可替换为真实 AI 推理。`
+  },
+
   // ===== 提示词解析器 =====
   analyzePrompt(promptText) {
     const text = promptText.trim();
@@ -420,6 +421,103 @@ cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
     }
 
     return improved === text ? null : improved;
+  },
+
+  // ===== 提示词格式转换 =====
+  convertPrompt(text, from, to) {
+    if (!text || from === to) return null;
+
+    // 解析源格式
+    const parsed = this.parsePrompt(text, from);
+    if (!parsed) return null;
+
+    // 转换为目标格式
+    return this.formatPrompt(parsed, to);
+  },
+
+  // 解析提示词为通用结构
+  parsePrompt(text, format) {
+    const result = {
+      subject: '',
+      style: '',
+      lighting: '',
+      camera: '',
+      params: {},
+      text: text
+    };
+
+    if (format === 'midjourney') {
+      // 解析 MJ 格式
+      const parts = text.split('--');
+      result.subject = parts[0].trim();
+      parts.slice(1).forEach(p => {
+        const match = p.match(/^(\w+)\s*(.*)$/s);
+        if (match) result.params[match[1].trim()] = match[2].trim();
+      });
+      // 提取风格、光照、镜头等
+      if (/cinematic/i.test(text)) result.style += 'cinematic ';
+      if (/photorealistic/i.test(text)) result.style += 'photorealistic ';
+      if (/ volumetric |rim light|lighting/i.test(text)) result.lighting = 'volumetric lighting';
+      if (/close-up|wide angle|overhead|aerial/i.test(text)) result.camera = (text.match(/(close-up|wide angle|overhead|aerial|fisheye|macro)/i) || [''])[0];
+    } else if (format === 'kling') {
+      // 解析 Kling 格式
+      const tags = ['Camera', 'Duration', 'Visual', 'Lighting', 'Style'];
+      tags.forEach(tag => {
+        const regex = new RegExp(`\\[${tag}\\]\\s*(.+)$`, 'm');
+        const match = text.match(regex);
+        if (match) {
+          if (tag === 'Camera') result.camera = match[1].trim();
+          if (tag === 'Visual') result.subject = match[1].trim();
+          if (tag === 'Lighting') result.lighting = match[1].trim();
+          if (tag === 'Style') result.style = match[1].trim();
+        }
+      });
+    } else if (format === 'suno') {
+      // 解析 Suno 格式
+      const tags = ['Genre', 'Mood', 'Instrument', 'Structure', 'Tempo'];
+      tags.forEach(tag => {
+        const regex = new RegExp(`\\[${tag}\\]\\s*(.+)$`, 'm');
+        const match = text.match(regex);
+        if (match) {
+          if (tag === 'Genre') result.params.genre = match[1].trim();
+          if (tag === 'Mood') result.params.mood = match[1].trim();
+          if (tag === 'Instrument') result.params.instrument = match[1].trim();
+          if (tag === 'Structure') result.params.structure = match[1].trim();
+          if (tag === 'Tempo') result.params.tempo = match[1].trim();
+        }
+      });
+    }
+
+    return result;
+  },
+
+  // 将通用结构格式化为目标格式
+  formatPrompt(parsed, format) {
+    if (format === 'midjourney') {
+      let mj = parsed.subject || 'high quality scene';
+      if (parsed.style) mj += `, ${parsed.style.trim()}`;
+      if (parsed.lighting) mj += `, ${parsed.lighting}`;
+      if (parsed.camera) mj += `, ${parsed.camera}`;
+      mj += ' --ar 16:9';
+      if (!parsed.params.v) mj += ' --v 6';
+      if (!parsed.params.style) mj += ' --style raw';
+      return mj;
+    } else if (format === 'kling') {
+      let kling = '[Camera] ' + (parsed.camera || 'Medium shot, smooth movement') + '\n';
+      kling += '[Duration] 8 seconds\n';
+      kling += '[Visual] ' + (parsed.subject || 'visual content') + '\n';
+      kling += '[Lighting] ' + (parsed.lighting || 'Natural, balanced') + '\n';
+      kling += '[Style] ' + (parsed.style || 'Photorealistic, high quality');
+      return kling;
+    } else if (format === 'suno') {
+      let suno = '[Genre] ' + (parsed.params.genre || 'Cinematic Orchestral') + '\n';
+      suno += '[Mood] ' + (parsed.params.mood || 'Epic, emotional') + '\n';
+      suno += '[Instrument] ' + (parsed.params.instrument || 'Full arrangement') + '\n';
+      suno += '[Structure] ' + (parsed.params.structure || '60s full track') + '\n';
+      suno += '[Tempo] ' + (parsed.params.tempo || '120 BPM');
+      return suno;
+    }
+    return parsed.text;
   }
 };
 

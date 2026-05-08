@@ -17,6 +17,37 @@
     areaAnalyze: document.getElementById('area-analyze'),
     btnAnalyze: document.getElementById('btn-analyze'),
     analyzeInput: document.getElementById('analyze-input'),
+    // 转换模式
+    areaConvert: document.getElementById('area-convert'),
+    btnConvert: document.getElementById('btn-convert'),
+    convertInput: document.getElementById('convert-input'),
+    convertFrom: document.getElementById('convert-from'),
+    convertTo: document.getElementById('convert-to'),
+    // 模板市场模式
+    areaTemplates: document.getElementById('area-templates'),
+    templateGrid: document.getElementById('template-grid'),
+    templateFilter: document.getElementById('template-filter'),
+    // 模板市场子标签页
+    tplTabs: document.getElementById('tpl-tabs'),
+    areaTplOfficial: document.getElementById('area-tpl-official'),
+    areaTplCommunity: document.getElementById('area-tpl-community'),
+    areaTplMine: document.getElementById('area-tpl-mine'),
+    // 社区模板
+    communityGrid: document.getElementById('community-grid'),
+    communityFilter: document.getElementById('community-filter'),
+    // 我的收藏
+    mineGrid: document.getElementById('mine-grid'),
+    // 社区操作按钮
+    btnImportTemplate: document.getElementById('btn-import-template'),
+    btnSubmitTemplate: document.getElementById('btn-submit-template'),
+    // 我的收藏操作按钮
+    btnExportMine: document.getElementById('btn-export-mine'),
+    btnImportMine: document.getElementById('btn-import-mine'),
+    // 提交弹窗
+    modalSubmit: document.getElementById('modal-submit'),
+    btnSubmitTemplate2: document.getElementById('btn-submit-template'),
+    // 隐藏文件导入
+    fileImport: document.getElementById('file-import'),
     // Tab 切换
     tabBtns: document.querySelectorAll('.tab-btn'),
     panels: document.querySelectorAll('.tab-panel'),
@@ -32,6 +63,10 @@
     // 解析结果
     contentAnalyze: document.getElementById('content-analyze'),
     copyAnalyze: document.getElementById('copy-analyze'),
+    // 转换结果
+    promptConvert: document.getElementById('prompt-convert'),
+    copyConvert: document.getElementById('copy-convert'),
+    convertLabel: document.getElementById('convert-label'),
     // 底部状态
     footerStatus: document.getElementById('footer-status'),
     // 弹窗
@@ -49,11 +84,14 @@
   };
 
   // ===== 当前模式 =====
-  let currentMode = 'generate'; // 'generate' | 'analyze'
+  let currentMode = 'generate'; // 'generate' | 'analyze' | 'convert' | 'templates'
 
   // ===== 状态 =====
   let currentData = null;
   let isRunning = false;
+
+  // ===== 当前模板子标签 =====
+  let currentTplTab = 'official';
 
   // ===== 模式切换 =====
   function switchMode(mode) {
@@ -62,12 +100,45 @@
       btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
     });
     const isGenerate = mode === 'generate';
+    const isAnalyze = mode === 'analyze';
+    const isConvert = mode === 'convert';
+    const isTemplates = mode === 'templates';
     dom.areaGenerate.style.display = isGenerate ? '' : 'none';
     dom.presetsGenerate.style.display = isGenerate ? '' : 'none';
     dom.btnRun.style.display = isGenerate ? '' : 'none';
-    dom.areaAnalyze.style.display = isGenerate ? 'none' : '';
-    dom.btnAnalyze.style.display = isGenerate ? 'none' : '';
-    updateFooter(isGenerate ? '就绪 · 输入创作需求后点击「启动 Agent 协作」' : '就绪 · 粘贴提示词后点击「解析提示词」');
+    dom.areaAnalyze.style.display = isAnalyze ? '' : 'none';
+    dom.btnAnalyze.style.display = isAnalyze ? '' : 'none';
+    dom.areaConvert.style.display = isConvert ? '' : 'none';
+    dom.btnConvert.style.display = isConvert ? '' : 'none';
+    dom.areaTemplates.style.display = isTemplates ? '' : 'none';
+    if (isTemplates) {
+      switchTplTab(currentTplTab);
+    }
+    const msgs = {
+      generate: '就绪 · 输入创作需求后点击「启动 Agent 协作」',
+      analyze: '就绪 · 粘贴提示词后点击「解析提示词」',
+      convert: '就绪 · 选择源格式和目标格式，粘贴提示词后点击「转换格式」',
+      templates: '就绪 · 选择模板，一键加载到创作需求'
+    };
+    updateFooter(msgs[mode] || '就绪');
+  }
+
+  // ===== 切换模板子标签 =====
+  function switchTplTab(tab) {
+    currentTplTab = tab;
+    dom.tplTabs.querySelectorAll('.tpl-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-tpltab') === tab);
+    });
+    dom.areaTplOfficial.style.display = tab === 'official' ? '' : 'none';
+    dom.areaTplCommunity.style.display = tab === 'community' ? '' : 'none';
+    dom.areaTplMine.style.display = tab === 'mine' ? '' : 'none';
+    if (tab === 'official') {
+      renderTemplateGrid('all');
+    } else if (tab === 'community') {
+      loadCommunityTemplates();
+    } else if (tab === 'mine') {
+      renderMineTemplates();
+    }
   }
 
   // ===== 初始化 =====
@@ -82,6 +153,57 @@
 
     // 解析模式：解析按钮
     dom.btnAnalyze.addEventListener('click', startAnalyze);
+
+    // 转换模式：转换按钮
+    dom.btnConvert.addEventListener('click', startConvert);
+
+    // 模板市场：过滤器按钮
+    dom.templateFilter.addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      dom.templateFilter.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTemplateGrid(btn.getAttribute('data-filter'));
+    });
+
+    // 模板市场：子标签页切换
+    dom.tplTabs.addEventListener('click', e => {
+      const btn = e.target.closest('.tpl-tab-btn');
+      if (!btn) return;
+      switchTplTab(btn.getAttribute('data-tpltab'));
+    });
+
+    // 模板市场：社区过滤器
+    dom.communityFilter.addEventListener('click', e => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      dom.communityFilter.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderCommunityGrid(currentCommunityTemplates, btn.getAttribute('data-cfilter'));
+    });
+
+    // 社区：导入模板文件
+    dom.btnImportTemplate.addEventListener('click', () => dom.fileImport.click());
+    dom.fileImport.addEventListener('change', handleImportCommunityTemplate);
+
+    // 社区：提交模板
+    dom.btnSubmitTemplate.addEventListener('click', openSubmitModal);
+
+    // 我的收藏：导出
+    dom.btnExportMine.addEventListener('click', exportMyTemplates);
+    dom.btnImportMine.addEventListener('click', () => dom.fileImport.click());
+    dom.fileImport.addEventListener('change', handleImportMyTemplates);
+
+    // 提交弹窗
+    dom.modalSubmit.addEventListener('click', e => {
+      if (e.target === dom.modalSubmit) dom.modalSubmit.style.display = 'none';
+    });
+    document.getElementById('modal-close-submit').addEventListener('click', () => {
+      dom.modalSubmit.style.display = 'none';
+    });
+    document.getElementById('btn-preview-submit').addEventListener('click', previewSubmitTemplate);
+    document.getElementById('btn-copy-submit').addEventListener('click', copySubmitTemplate);
+    document.getElementById('submit-prompt').addEventListener('input', autoFillSubmitForm);
 
     // 示例按钮（仅生成模式）
     document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -110,12 +232,321 @@
     dom.copySuno.addEventListener('click', () => copyText(dom.promptSuno.textContent));
     dom.copySummary.addEventListener('click', () => copyText(dom.contentSummary.textContent));
     dom.copyAnalyze.addEventListener('click', () => copyText(dom.contentAnalyze.textContent));
+    dom.copyConvert.addEventListener('click', () => copyText(dom.promptConvert.textContent));
 
     // 操作按钮
     dom.btnExportAll.addEventListener('click', exportAll);
     dom.btnReset.addEventListener('click', resetAll);
 
     updateFooter('就绪 · 输入创作需求后点击「启动 Agent 协作」');
+  }
+
+  // ===== 渲染模板网格 =====
+  function renderTemplateGrid(filter) {
+    const filtered = filter === 'all' ? TEMPLATES : TEMPLATES.filter(t => t.category === filter);
+    if (!filtered.length) {
+      dom.templateGrid.innerHTML = '<div class="template-empty">该分类暂无模板</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    filtered.forEach(t => {
+      const tags = t.tags.map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `\
+<div class="template-card" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}</div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <button class="tpl-use-btn">使用模板</button>
+</div>`;
+    });
+    dom.templateGrid.innerHTML = html;
+
+    // 绑定点击事件
+    dom.templateGrid.querySelectorAll('.template-card').forEach(card => {
+      card.querySelector('.tpl-use-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        loadTemplate(card.getAttribute('data-id'));
+      });
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id')));
+    });
+  }
+
+  // ===== 社区模板 Gist URL =====
+  const COMMUNITY_GIST_URL = 'https://gist.githubusercontent.com/lzw-DDS/d7bf5665a038c6a0a717fdea13fa622f/raw/community-templates.json';
+  const MINE_KEY = 'ai-sight-my-templates';
+
+  let currentCommunityTemplates = [];
+  let currentCommunityFilter = 'all';
+
+  // ===== 加载社区模板 =====
+  async function loadCommunityTemplates() {
+    dom.communityGrid.innerHTML = '<div class="tpl-loading"><span class="tpl-spinner">⟳</span> 加载社区模板中...</div>';
+    try {
+      const res = await fetch(COMMUNITY_GIST_URL);
+      if (!res.ok) throw new Error('Network error');
+      const data = await res.json();
+      currentCommunityTemplates = data.templates || [];
+      renderCommunityGrid(currentCommunityTemplates, currentCommunityFilter);
+    } catch (e) {
+      dom.communityGrid.innerHTML = '<div class="tpl-error">⚠️ 加载失败，请检查网络后重试</div>';
+    }
+  }
+
+  // ===== 渲染社区模板卡片 =====
+  function renderCommunityGrid(templates, filter) {
+    currentCommunityFilter = filter;
+    const filtered = filter === 'all' ? templates : templates.filter(t => t.category === filter);
+    if (!filtered.length) {
+      dom.communityGrid.innerHTML = '<div class="tpl-empty">该分类暂无社区模板</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    filtered.forEach(t => {
+      const tags = (t.tags || []).map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}<span class="tpl-author"> · ${t.author || '匿名'}</span></div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <div class="tpl-card-actions">
+    <button class="tpl-star-btn" data-id="${t.id}" title="收藏到我的">⭐</button>
+    <button class="tpl-use-btn" data-id="${t.id}">使用</button>
+  </div>
+</div>`;
+    });
+    dom.communityGrid.innerHTML = html;
+    dom.communityGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); loadTemplate(btn.getAttribute('data-id'), currentCommunityTemplates); });
+    });
+    dom.communityGrid.querySelectorAll('.tpl-star-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const tpl = currentCommunityTemplates.find(t => t.id === id);
+        if (tpl) {
+          saveToMyTemplates(tpl);
+          btn.textContent = '✅';
+          btn.disabled = true;
+        }
+      });
+    });
+    dom.communityGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id'), currentCommunityTemplates));
+    });
+  }
+
+  // ===== 我的收藏：读取 =====
+  function getMyTemplates() {
+    try { return JSON.parse(localStorage.getItem(MINE_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  // ===== 我的收藏：保存单个 =====
+  function saveToMyTemplates(tpl) {
+    const mine = getMyTemplates();
+    if (mine.find(t => t.id === tpl.id)) return;
+    mine.push({ ...tpl, savedAt: Date.now() });
+    localStorage.setItem(MINE_KEY, JSON.stringify(mine));
+    showToast('⭐ 已收藏到「我的收藏」');
+  }
+
+  // ===== 我的收藏：渲染 =====
+  function renderMineTemplates() {
+    const mine = getMyTemplates();
+    if (!mine.length) {
+      dom.mineGrid.innerHTML = '<div class="tpl-empty">还没有收藏任何模板，去社区找找吧！</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    mine.forEach(t => {
+      const tags = (t.tags || []).map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card template-card-mine" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}</div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <div class="tpl-card-actions">
+    <button class="tpl-remove-btn" data-id="${t.id}" title="移除">✕</button>
+    <button class="tpl-use-btn" data-id="${t.id}">使用</button>
+  </div>
+</div>`;
+    });
+    dom.mineGrid.innerHTML = html;
+    dom.mineGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); loadTemplate(btn.getAttribute('data-id'), mine); });
+    });
+    dom.mineGrid.querySelectorAll('.tpl-remove-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        removeFromMyTemplates(btn.getAttribute('data-id'));
+      });
+    });
+    dom.mineGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id'), mine));
+    });
+  }
+
+  // ===== 我的收藏：移除 =====
+  function removeFromMyTemplates(id) {
+    let mine = getMyTemplates();
+    mine = mine.filter(t => t.id !== id);
+    localStorage.setItem(MINE_KEY, JSON.stringify(mine));
+    renderMineTemplates();
+    showToast('🗑️ 已从收藏中移除');
+  }
+
+  // ===== 我的收藏：导出 =====
+  function exportMyTemplates() {
+    const mine = getMyTemplates();
+    if (!mine.length) { showToast('⚠️ 收藏为空，无需导出'); return; }
+    const blob = new Blob([JSON.stringify(mine, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `ai-sight-my-templates-${Date.now()}.json`;
+    a.click();
+    showToast('📦 收藏已导出为 JSON 文件');
+  }
+
+  // ===== 导入到我的收藏 =====
+  function handleImportMyTemplates(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!Array.isArray(imported)) throw new Error('not array');
+        const mine = getMyTemplates();
+        let added = 0;
+        imported.forEach(t => {
+          if (t.title && t.prompt && !mine.find(m => m.id === t.id)) {
+            mine.push({ ...t, savedAt: Date.now() });
+            added++;
+          }
+        });
+        localStorage.setItem(MINE_KEY, JSON.stringify(mine));
+        renderMineTemplates();
+        showToast(`✅ 成功导入 ${added} 个模板`);
+      } catch {
+        showToast('❌ JSON 格式错误，导入失败');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  // ===== 导入社区模板文件 =====
+  function handleImportCommunityTemplate(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const imported = data.templates || [];
+        if (!imported.length) throw new Error('no templates');
+        currentCommunityTemplates = [...imported, ...currentCommunityTemplates];
+        renderCommunityGrid(currentCommunityTemplates, currentCommunityFilter);
+        showToast(`✅ 成功导入 ${imported.length} 个社区模板`);
+      } catch {
+        showToast('❌ JSON 格式错误，需包含 templates 数组');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  // ===== 打开提交弹窗 =====
+  function openSubmitModal() {
+    dom.modalSubmit.style.display = 'flex';
+    document.getElementById('submit-preview').innerHTML = '';
+  }
+
+  // ===== 自动填表 =====
+  function autoFillSubmitForm() {
+    const prompt = document.getElementById('submit-prompt').value.trim();
+    if (prompt && !document.getElementById('submit-title').value.trim()) {
+      // 从提示词猜测一个标题
+      const short = prompt.slice(0, 20);
+      document.getElementById('submit-title').value = '📝 ' + short + (prompt.length > 20 ? '...' : '');
+    }
+  }
+
+  // ===== 预览提交 JSON =====
+  function previewSubmitTemplate() {
+    const entry = buildSubmitEntry();
+    if (!entry) return;
+    const preview = document.getElementById('submit-preview');
+    preview.innerHTML = `<div class="submit-json-label">📋 JSON 预览（复制后粘贴到 Gist）</div>
+<pre class="submit-json-preview">${escapeForHtml(JSON.stringify(entry, null, 2))}</pre>`;
+  }
+
+  // ===== 复制提交 JSON =====
+  function copySubmitTemplate() {
+    const entry = buildSubmitEntry();
+    if (!entry) return;
+    const json = JSON.stringify(entry, null, 2);
+    copyText(json).then(() => {
+      showToast('✅ JSON 已复制！打开 Gist 编辑并提交');
+      dom.modalSubmit.style.display = 'none';
+      window.open('https://gist.github.com/lzw-DDS/d7bf5665a038c6a0a717fdea13fa622f', '_blank');
+    });
+  }
+
+  // ===== 构建提交条目 =====
+  function buildSubmitEntry() {
+    const title = document.getElementById('submit-title').value.trim();
+    const category = document.getElementById('submit-category').value;
+    const description = document.getElementById('submit-desc').value.trim();
+    const tagsRaw = document.getElementById('submit-tags').value.trim();
+    const prompt = document.getElementById('submit-prompt').value.trim();
+    const author = document.getElementById('submit-author').value.trim() || '匿名';
+    const tags = tagsRaw ? tagsRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean) : [];
+    if (!title || !prompt) {
+      showToast('⚠️ 标题和提示词不能为空');
+      return null;
+    }
+    return {
+      id: 'user-' + Date.now(),
+      title,
+      category,
+      description,
+      tags,
+      prompt,
+      author
+    };
+  }
+
+  // ===== 增强版加载模板（支持模板数组）=====
+  function loadTemplate(id, source) {
+    const src = source || TEMPLATES;
+    const tpl = src.find(t => t.id === id);
+    if (!tpl) return;
+    if (tpl.category === 'convert') {
+      switchMode('convert');
+      dom.convertFrom.value = tpl.convertFrom || 'midjourney';
+      dom.convertTo.value = tpl.convertTo || 'kling';
+      dom.convertInput.value = tpl.convertText || tpl.prompt || '';
+      showToast(`✅ 已加载「${tpl.title}」到转换模式`);
+    } else {
+      switchMode('generate');
+      dom.userInput.value = tpl.prompt || '';
+      dom.userInput.focus();
+      showToast(`✅ 已加载「${tpl.title}」到创作需求`);
+    }
   }
 
   // ===== 启动流程 =====
@@ -140,17 +571,22 @@
 
     updateFooter('🤖 Agent 协作启动中...');
 
+    try {
+
     // ===== 阶段1：理解 Agent =====
     updateFooter('🔍 理解 Agent 工作中...');
     Animation.setAgentStatus('understand', 'running', '处理中...');
     Animation.activateNode('node-understand');
 
     const understandResult = AgentSimulator.understandAgent(input);
-    await Animation.typeLines(dom.contentUnderstand, understandResult.thinking, 35, 150);
+    await Animation.typeLines(dom.contentUnderstand, understandResult.thinking, 25, 100);
 
-    // 显示理解结果
+    // 显示理解结果（追加新 div，不覆写已有内容）
     const summaryText = `✅ 需求解析完成\n• 识别关键词：${understandResult.result.keywords.join('、')}\n• 拆解任务数：${understandResult.result.taskCount} 个\n• 任务概要：${understandResult.result.summary}`;
-    await Animation.typeWriter(dom.contentUnderstand, '\n' + summaryText, 20);
+    const sumEl = document.createElement('div');
+    sumEl.style.marginTop = '8px';
+    dom.contentUnderstand.appendChild(sumEl);
+    await Animation.typeWriter(sumEl, summaryText, 15);
     Animation.setAgentStatus('understand', 'done', '✅ 完成');
     await Animation.sleep(300);
     await Animation.emitParticle('particle1');
@@ -162,11 +598,14 @@
     Animation.activateNode('node-generate');
 
     const genResult = AgentSimulator.generateAgent(understandResult.result);
-    await Animation.typeLines(dom.contentGenerate, genResult.thinking, 35, 150);
+    await Animation.typeLines(dom.contentGenerate, genResult.thinking, 25, 100);
 
-    // 显示生成结果摘要
+    // 显示生成结果摘要（追加新 div）
     const genSummary = `✅ 提示词生成完成\n• Midjourney：${genResult.result.variations.length} 个方案\n• Kling：视频提示词就绪\n• Suno：音乐提示词就绪\n• 质量评估：${genResult.result.quality}`;
-    await Animation.typeWriter(dom.contentGenerate, '\n' + genSummary, 20);
+    const genEl = document.createElement('div');
+    genEl.style.marginTop = '8px';
+    dom.contentGenerate.appendChild(genEl);
+    await Animation.typeWriter(genEl, genSummary, 15);
     Animation.setAgentStatus('generate', 'done', '✅ 完成');
 
     // 填充右侧输出面板
@@ -184,10 +623,13 @@
     Animation.activateNode('node-execute');
 
     const execResult = AgentSimulator.executeAgent(genResult.result);
-    await Animation.typeLines(dom.contentExecute, execResult.thinking, 35, 150);
+    await Animation.typeLines(dom.contentExecute, execResult.thinking, 25, 100);
 
-    // 显示执行报告
-    await Animation.typeWriter(dom.contentExecute, '\n' + execResult.result.report, 15);
+    // 显示执行报告（追加新 div）
+    const rptEl = document.createElement('div');
+    rptEl.style.marginTop = '8px';
+    dom.contentExecute.appendChild(rptEl);
+    await Animation.typeWriter(rptEl, execResult.result.report, 10);
     Animation.setAgentStatus('execute', 'done', '✅ 完成');
 
     // 填充综合报告
@@ -214,6 +656,14 @@
 
     // 自动切换到第一个 tab
     switchTab('mj');
+
+    } catch (err) {
+      console.error('[AI Sight] 流程异常：', err);
+      updateFooter('❌ 流程出现异常，请刷新后重试');
+    } finally {
+      dom.btnRun.disabled = false;
+      isRunning = false;
+    }
   }
 
   // ===== 启动解析流程 =====
@@ -251,6 +701,50 @@
     dom.btnAnalyze.innerHTML = '<span class="btn-icon">🔍</span> 重新解析';
     updateFooter('✅ 解析完成 · 可查看右侧「解析结果」Tab');
     switchTab('analyze');
+  }
+
+  // ===== 启动转换流程 =====
+  async function startConvert() {
+    const input = dom.convertInput.value.trim();
+    if (!input) {
+      dom.convertInput.focus();
+      dom.convertInput.style.borderColor = '#ef4444';
+      setTimeout(() => dom.convertInput.style.borderColor = '', 1500);
+      return;
+    }
+
+    const fromFormat = dom.convertFrom.value;
+    const toFormat = dom.convertTo.value;
+    if (fromFormat === toFormat) {
+      showToast('⚠️ 源格式和目标格式不能相同');
+      return;
+    }
+
+    dom.btnConvert.disabled = true;
+    dom.btnConvert.innerHTML = '<span class="btn-icon">⏳</span> 转换中...';
+    updateFooter(`🔄 正在将 ${fromFormat} 提示词转换为 ${toFormat} 格式...`);
+
+    // 清空转换结果
+    dom.promptConvert.textContent = '转换中...';
+
+    // 模拟短暂处理延迟
+    await Animation.sleep(500);
+
+    const result = AgentSimulator.convertPrompt(input, fromFormat, toFormat);
+    if (!result) {
+      dom.promptConvert.textContent = '转换失败，请检查输入内容';
+      dom.btnConvert.disabled = false;
+      dom.btnConvert.innerHTML = '<span class="btn-icon">🔄</span> 转换格式';
+      return;
+    }
+
+    dom.promptConvert.textContent = result;
+    dom.convertLabel.textContent = `🔄 ${fromFormat} → ${toFormat} 转换结果`;
+
+    dom.btnConvert.disabled = false;
+    dom.btnConvert.innerHTML = '<span class="btn-icon">🔄</span> 重新转换';
+    updateFooter(`✅ 转换完成 · 可复制右侧「转换结果」Tab`);
+    switchTab('convert');
   }
 
   // ===== 渲染解析结果 =====
@@ -359,13 +853,18 @@
   function resetAll() {
     dom.userInput.value = '';
     dom.analyzeInput.value = '';
+    dom.convertInput.value = '';
     resetPanels();
     currentData = null;
     dom.btnRun.innerHTML = '<span class="btn-icon">▶</span> 启动 Agent 协作';
     dom.btnRun.disabled = false;
     dom.btnAnalyze.innerHTML = '<span class="btn-icon">🔍</span> 解析提示词';
     dom.btnAnalyze.disabled = false;
+    dom.btnConvert.innerHTML = '<span class="btn-icon">🔄</span> 转换格式';
+    dom.btnConvert.disabled = false;
+    dom.areaTemplates.style.display = 'none';
     isRunning = false;
+    currentTplTab = 'official';
     switchMode('generate');
   }
 

@@ -57,6 +57,10 @@
 - 📦 **一键导出** — 导出完整提示词包
 - 🎨 **深色科技感 UI** — SVG 动画流程图 + 流畅交互
 - 🔄 **纯本地运行** — 零 API 成本，零网络依赖，双击即用
+- 📚 **工作流模板市场** — 9 个内置模板，覆盖图像/视频/音乐/文案
+- 🌐 **社区模板库** — 连接 GitHub Gist，一键导入社区模板
+- ⭐ **收藏系统** — 收藏常用模板，快速调用
+- 📥📤 **导入/导出** — JSON 格式备份与恢复模板数据
 
 ---
 
@@ -75,15 +79,16 @@
 ## 📂 文件结构
 
 ```
-├── index.html          # 主界面
-├── app.js              # 主逻辑
+├── index.html          # 主界面（4 模式：生成/解析/转换/模板）
+├── app.js              # 主逻辑 + 社区功能
 ├── css/
 │   └── style.css       # 深色科技感样式
 ├── js/
 │   ├── agents.js       # Agent 模拟逻辑
 │   └── animation.js    # 动画效果
 ├── data/
-│   └── prompts.js      # 提示词模板库
+│   ├── prompts.js      # 提示词模板库
+│   └── templates.js    # 官方工作流模板数据
 └── README.md           # 本文档
 ```
 
@@ -105,6 +110,19 @@ python -m http.server 8080
 npx serve .
 ```
 访问 `http://localhost:8080`
+
+---
+
+## 🌐 社区模板库
+
+AI Sight 支持从 GitHub Gist 读取社区模板：
+
+- **Gist 地址**：[github.com/lzw-DDS](https://gist.github.com/lzw-DDS/d7bf5665a038c6a0a717fdea13fa622f)
+- **功能**：一键导入社区模板 → ⭐ 收藏到本地 → 导出备份 JSON
+
+在「模板市场」模式中点击「🌐 社区模板库」即可使用。
+
+---
 
 ## 🔮 后续规划
 

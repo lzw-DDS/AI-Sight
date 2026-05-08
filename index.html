@@ -31,6 +31,8 @@
       <div class="mode-switch">
         <button class="mode-btn active" data-mode="generate">⚡ 生成提示词</button>
         <button class="mode-btn" data-mode="analyze">🔍 解析提示词</button>
+        <button class="mode-btn" data-mode="convert">🔄 转换格式</button>
+        <button class="mode-btn" data-mode="templates">📦 模板市场</button>
       </div>
 
       <!-- 生成模式：需求输入 -->
@@ -49,6 +51,144 @@
         </div>
       </div>
 
+      <!-- 转换模式：格式互转 -->
+      <div class="input-area" id="area-convert" style="display:none">
+        <div class="convert-options">
+          <div class="convert-row">
+            <label>从</label>
+            <select id="convert-from">
+              <option value="midjourney">Midjourney</option>
+              <option value="kling">Kling</option>
+              <option value="suno">Suno</option>
+            </select>
+            <span class="convert-arrow">→</span>
+            <label>到</label>
+            <select id="convert-to">
+              <option value="kling">Kling</option>
+              <option value="midjourney">Midjourney</option>
+              <option value="suno">Suno</option>
+            </select>
+          </div>
+        </div>
+        <textarea id="convert-input" placeholder="粘贴需要转换的提示词...&#10;&#10;例如：&#10;A cinematic shot, neon lights --ar 16:9 --v 6"></textarea>
+        <div class="input-tips">
+          <span class="tip">💡 自动识别源格式，将提示词转换为目标工具格式</span>
+        </div>
+      </div>
+
+      <!-- 模板市场 -->
+      <div class="input-area" id="area-templates" style="display:none">
+        <!-- 子标签页 -->
+        <div class="tpl-tabs" id="tpl-tabs">
+          <button class="tpl-tab-btn active" data-tpltab="official">📚 官方模板</button>
+          <button class="tpl-tab-btn" data-tpltab="community">🌐 社区模板</button>
+          <button class="tpl-tab-btn" data-tpltab="mine">⭐ 我的收藏</button>
+        </div>
+
+        <!-- 官方模板区 -->
+        <div class="tpl-sub-area" id="area-tpl-official">
+          <div class="template-filter" id="template-filter">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="video">🎬 视频</button>
+            <button class="filter-btn" data-filter="image">🖼️ 图像</button>
+            <button class="filter-btn" data-filter="music">🎵 音乐</button>
+            <button class="filter-btn" data-filter="convert">🔄 转换</button>
+          </div>
+          <div class="template-grid" id="template-grid"></div>
+        </div>
+
+        <!-- 社区模板区 -->
+        <div class="tpl-sub-area" id="area-tpl-community" style="display:none">
+          <div class="tpl-community-header">
+            <span class="tpl-community-tip">🌐 社区成员贡献的模板，可直接使用或导入</span>
+            <div class="tpl-community-actions">
+              <button class="btn-sm" id="btn-import-template">📥 导入模板</button>
+              <button class="btn-sm btn-accent" id="btn-submit-template">📤 提交模板</button>
+            </div>
+          </div>
+          <div class="template-filter" id="community-filter">
+            <button class="filter-btn active" data-cfilter="all">全部</button>
+            <button class="filter-btn" data-cfilter="video">🎬 视频</button>
+            <button class="filter-btn" data-cfilter="image">🖼️ 图像</button>
+            <button class="filter-btn" data-cfilter="music">🎵 音乐</button>
+            <button class="filter-btn" data-cfilter="convert">🔄 转换</button>
+          </div>
+          <div class="template-grid" id="community-grid">
+            <div class="tpl-loading"><span class="tpl-spinner">⟳</span> 加载社区模板中...</div>
+          </div>
+        </div>
+
+        <!-- 我的收藏区 -->
+        <div class="tpl-sub-area" id="area-tpl-mine" style="display:none">
+          <div class="tpl-mine-header">
+            <span class="tpl-mine-tip">⭐ 你收藏的模板，存储在本地浏览器</span>
+            <div class="tpl-mine-actions">
+              <button class="btn-sm" id="btn-export-mine">📦 导出收藏</button>
+              <button class="btn-sm" id="btn-import-mine">📥 导入收藏</button>
+            </div>
+          </div>
+          <div class="template-grid" id="mine-grid">
+            <div class="tpl-empty">还没有收藏任何模板，试试社区里找找！</div>
+          </div>
+        </div>
+
+        <!-- 提交模板弹窗 -->
+        <div class="modal-overlay" id="modal-submit" style="display:none">
+          <div class="modal">
+            <div class="modal-header">
+              <h3>📤 提交社区模板</h3>
+              <button class="modal-close" id="modal-close-submit">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="submit-steps">
+                <div class="submit-step"><span class="step-num">1</span>填写模板信息（左侧留空会自动填入当前需求）</div>
+                <div class="submit-step"><span class="step-num">2</span>点击「复制 JSON」获取格式化内容</div>
+                <div class="submit-step"><span class="step-num">3</span>打开 GitHub Gist 编辑 JSON 并提交 Pull Request</div>
+              </div>
+              <div class="submit-form">
+                <div class="form-row">
+                  <label>标题</label>
+                  <input type="text" id="submit-title" placeholder="例如：🌊 深海探索 · 自然纪录片">
+                </div>
+                <div class="form-row">
+                  <label>分类</label>
+                  <select id="submit-category">
+                    <option value="video">🎬 视频</option>
+                    <option value="image">🖼️ 图像</option>
+                    <option value="music">🎵 音乐</option>
+                    <option value="convert">🔄 转换</option>
+                  </select>
+                </div>
+                <div class="form-row">
+                  <label>描述</label>
+                  <input type="text" id="submit-desc" placeholder="简要描述这个模板的用途">
+                </div>
+                <div class="form-row">
+                  <label>标签</label>
+                  <input type="text" id="submit-tags" placeholder="用逗号分隔，如：科幻,末日,分镜">
+                </div>
+                <div class="form-row">
+                  <label>提示词</label>
+                  <textarea id="submit-prompt" rows="4" placeholder="创作需求或提示词内容"></textarea>
+                </div>
+                <div class="form-row">
+                  <label>作者名</label>
+                  <input type="text" id="submit-author" placeholder="你的名字或昵称">
+                </div>
+              </div>
+              <div class="submit-preview" id="submit-preview"></div>
+              <div class="submit-actions">
+                <button class="btn btn-secondary" id="btn-preview-submit">👁️ 预览 JSON</button>
+                <button class="btn btn-primary" id="btn-copy-submit">📋 复制 JSON</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 导入用的隐藏 input -->
+        <input type="file" id="file-import" accept=".json" style="display:none">
+      </div>
+
       <div class="preset-prompts" id="presets-generate">
         <div class="preset-title">🎯 快速示例</div>
         <div class="preset-list">
@@ -64,6 +204,9 @@
       </button>
       <button class="btn btn-primary btn-run" id="btn-analyze" style="display:none">
         <span class="btn-icon">🔍</span> 解析提示词
+      </button>
+      <button class="btn btn-primary btn-run" id="btn-convert" style="display:none">
+        <span class="btn-icon">🔄</span> 转换格式
       </button>
     </section>
 
@@ -166,6 +309,7 @@
         <button class="tab-btn" data-tab="suno">Suno</button>
         <button class="tab-btn" data-tab="summary">综合报告</button>
         <button class="tab-btn" data-tab="analyze">🔍 解析结果</button>
+        <button class="tab-btn" data-tab="convert">🔄 转换结果</button>
       </div>
       <div class="output-content">
         <div class="tab-panel active" id="tab-mj">
@@ -205,6 +349,15 @@
           <div class="analyze-content" id="content-analyze">
             <div class="analyze-placeholder">在左侧输入提示词并点击「解析提示词」</div>
           </div>
+        </div>
+
+        <!-- 转换结果 Tab -->
+        <div class="tab-panel" id="tab-convert">
+          <div class="prompt-header">
+            <span class="prompt-label" id="convert-label">🔄 转换结果</span>
+            <button class="btn-icon" id="copy-convert" title="复制">📋</button>
+          </div>
+          <pre class="prompt-content" id="prompt-convert">等待转换...</pre>
         </div>
       </div>
       <div class="output-actions">
@@ -257,6 +410,7 @@
   </div>
 
   <script src="data/prompts.js"></script>
+  <script src="data/templates.js"></script>
   <script src="js/animation.js"></script>
   <script src="js/agents.js"></script>
   <script src="app.js"></script>

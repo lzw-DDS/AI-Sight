@@ -5,34 +5,33 @@ const Animation = {
   // 打字机效果：逐字显示文字
   typeWriter(element, text, speed = 30) {
     return new Promise((resolve) => {
+      // 用 textNode + cursor 双节点方案，避免 innerHTML += 每次重建 DOM 导致 cursor 引用失效
       element.innerHTML = '';
-      let i = 0;
+      const textNode = document.createTextNode('');
       const cursor = document.createElement('span');
       cursor.className = 'typing-cursor';
+      element.appendChild(textNode);
       element.appendChild(cursor);
 
+      let i = 0;
       const timer = setInterval(() => {
         if (i < text.length) {
-          cursor.remove();
-          element.innerHTML += this.escapeHtml(text[i]);
-          element.appendChild(cursor);
+          textNode.textContent += text[i];
           i++;
         } else {
           clearInterval(timer);
-          // 闪烁几次光标后消失
           setTimeout(() => {
             cursor.remove();
             resolve();
-          }, 800);
+          }, 500);
         }
       }, speed);
     });
   },
 
-  // 逐行打字机（用于多行输出）
+  // 逐行打字机（用于多行输出，保留已有内容，依次追加新行）
   typeLines(element, lines, lineSpeed = 40, lineDelay = 200) {
     return new Promise((resolve) => {
-      element.innerHTML = '';
       let lineIndex = 0;
 
       const addLine = () => {
@@ -42,7 +41,7 @@ const Animation = {
         }
         const line = lines[lineIndex];
         const lineEl = document.createElement('div');
-        lineEl.style.minHeight = '1.2em';
+        lineEl.style.minHeight = '1.4em';
         element.appendChild(lineEl);
         lineIndex++;
 
@@ -117,7 +116,6 @@ const Animation = {
         if (p) {
           p.style.opacity = '1';
           p.style.transition = 'all 1.2s ease-in';
-          // 根据粒子 ID 决定移动方向
           if (particleId === 'particle1') {
             p.setAttribute('cy', '155');
           } else if (particleId === 'particle2') {
@@ -140,19 +138,16 @@ const Animation = {
   async runFlowAnimation() {
     this.resetNodes();
 
-    // 阶段1：理解 Agent
     this.activateNode('node-understand');
     await this.sleep(400);
     await this.emitParticle('particle1');
     await this.activateArrow('arrow1', 'arrowhead1');
 
-    // 阶段2：生成 Agent
     this.activateNode('node-generate');
     await this.sleep(400);
     await this.emitParticle('particle2');
     await this.activateArrow('arrow2', 'arrowhead2');
 
-    // 阶段3：执行 Agent
     this.activateNode('node-execute');
     await this.sleep(400);
     await this.emitParticle('particle3');
