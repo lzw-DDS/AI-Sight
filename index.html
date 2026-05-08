@@ -15,8 +15,10 @@
       <span class="logo-sub">多 Agent 提示词工程工作台</span>
     </div>
     <div class="header-actions">
+      <button class="btn btn-ghost" id="btn-settings" title="AI 设置">⚙️ 设置</button>
       <button class="btn btn-ghost" id="btn-history">📜 历史</button>
       <button class="btn btn-ghost" id="btn-howitworks">工作原理</button>
+      <button class="btn btn-ghost" id="btn-theme" title="切换主题">🌙</button>
     </div>
   </header>
 
@@ -26,6 +28,17 @@
       <div class="panel-header">
         <h2>📝 创作需求</h2>
         <span class="panel-badge">输入</span>
+      </div>
+
+      <!-- Agent 人格选择 -->
+      <div class="persona-bar">
+        <span class="persona-label">🤖 Agent 人格：</span>
+        <div class="persona-chips">
+          <button class="persona-chip active" data-persona="director">🎬 导演</button>
+          <button class="persona-chip" data-persona="planner">🎮 策划</button>
+          <button class="persona-chip" data-persona="writer">✍️ 作者</button>
+          <button class="persona-chip" data-persona="artist">🖌️ 美术</button>
+        </div>
       </div>
 
       <!-- 模式切换 -->
@@ -124,9 +137,14 @@
           <div class="tpl-mine-header">
             <span class="tpl-mine-tip">⭐ 你收藏的模板，存储在本地浏览器</span>
             <div class="tpl-mine-actions">
-              <button class="btn-sm" id="btn-export-mine">📦 导出收藏</button>
-              <button class="btn-sm" id="btn-import-mine">📥 导入收藏</button>
+              <button class="btn-sm" id="btn-new-group">📁 新分组</button>
+              <button class="btn-sm" id="btn-export-mine">📦 导出</button>
+              <button class="btn-sm" id="btn-import-mine">📥 导入</button>
             </div>
+          </div>
+          <!-- 分组标签 -->
+          <div class="template-groups" id="template-groups">
+            <button class="group-btn active" data-group="all">全部</button>
           </div>
           <div class="template-grid" id="mine-grid">
             <div class="tpl-empty">还没有收藏任何模板，试试社区里找找！</div>
@@ -227,6 +245,9 @@
             </div>
           </div>
           <div class="modal-body">
+            <div class="history-search">
+              <input type="text" id="history-search-input" placeholder="🔍 搜索历史记录...">
+            </div>
             <div class="history-list" id="history-list">
               <div class="history-empty">暂无历史记录</div>
             </div>
@@ -237,11 +258,21 @@
       <div class="preset-prompts" id="presets-generate">
         <div class="preset-title">🎯 快速示例</div>
         <div class="preset-list">
-          <button class="preset-btn" data-prompt="制作一个科幻风格的短视频，主题是地球呼吸，展示地球作为一个生命体的概念">地球呼吸 · 科幻短视频</button>
-          <button class="preset-btn" data-prompt="生成一个丧尸末日世界观的分镜脚本，重点展示感染者与正常人的对视时刻">丧尸末日 · 分镜脚本</button>
-          <button class="preset-btn" data-prompt="创建一组 Minecraft 风格的建筑模组宣传图">Minecraft · 维度宣传图</button>
-          <button class="preset-btn" data-prompt="生成一段神秘氛围的背景音乐提示词">悬疑游戏 · 背景音乐</button>
+          <button class="preset-btn" data-prompt="雨后的老巷子，阳光穿透梧桐树叶，斑驳的光影落在青石板路上，一个穿校服的女孩撑着油纸伞回头张望">雨巷 · 诗意摄影</button>
+          <button class="preset-btn" data-prompt="深海钻井平台发生泄漏事故，一头巨大的鲸鱼被原油困住，在黑暗中发出悲鸣">环保议题 · 公益海报</button>
+          <button class="preset-btn" data-prompt="未来城市的空中花园，高耸入云的摩天楼覆盖着垂直绿化，飞行汽车穿梭其间">未来城市 · 概念设计</button>
+          <button class="preset-btn" data-prompt="蒸汽朋克风格的机械管家，铜质齿轮与黄铜管道外露，蓝眼睛的玻璃义眼闪烁着微光">机械美学 · 角色立绘</button>
         </div>
+      </div>
+
+      <!-- 快速模式切换 -->
+      <div class="quick-mode-bar" id="quick-mode-bar">
+        <label class="quick-mode-toggle">
+          <input type="checkbox" id="quick-mode-toggle">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">⚡ 快速模式</span>
+        </label>
+        <span class="quick-mode-hint">开启后直接输出，跳过动画演示</span>
       </div>
 
       <button class="btn btn-primary btn-run" id="btn-run">
@@ -253,6 +284,9 @@
       <button class="btn btn-primary btn-run" id="btn-convert" style="display:none">
         <span class="btn-icon">🔄</span> 转换格式
       </button>
+      <div class="draft-indicator" id="draft-indicator" style="display:none">
+        <span class="draft-dot"></span> 草稿已自动保存
+      </div>
     </section>
 
     <!-- 中间：Agent 工作流程 -->
@@ -381,9 +415,30 @@
         <div class="tab-panel" id="tab-summary">
           <div class="prompt-header">
             <span class="prompt-label">综合报告</span>
-            <button class="btn-icon" id="copy-summary" title="复制">📋</button>
+            <div class="header-actions-inline">
+              <button class="btn-icon" id="btn-copy-all" title="复制全部">📋 全部</button>
+              <button class="btn-icon" id="btn-compare" title="对比模式">⚖️</button>
+              <button class="btn-icon" id="copy-summary" title="复制">📋</button>
+            </div>
           </div>
           <div class="summary-content" id="content-summary">等待生成...</div>
+          <!-- 雷达图评分 -->
+          <div class="score-radar" id="score-radar" style="display:none">
+            <div class="radar-title">📊 提示词质量雷达图</div>
+            <canvas id="radar-canvas" width="220" height="220"></canvas>
+          </div>
+          <!-- A/B 对比模式 -->
+          <div class="compare-mode" id="compare-mode" style="display:none">
+            <div class="compare-header">
+              <span class="compare-title">⚖️ 方案对比</span>
+              <button class="btn-sm" id="btn-close-compare">关闭</button>
+            </div>
+            <div class="compare-grid">
+              <div class="compare-col" id="compare-a"></div>
+              <div class="compare-divider"></div>
+              <div class="compare-col" id="compare-b"></div>
+            </div>
+          </div>
         </div>
         <!-- 解析结果 Tab -->
         <div class="tab-panel" id="tab-analyze">
@@ -415,8 +470,135 @@
   <!-- 底部状态栏 -->
   <footer class="footer">
     <span class="footer-status" id="footer-status">就绪 · 等待输入</span>
-    <span class="footer-info">AI Sight v1.0 · 纯前端 · 零 API 成本</span>
+    <span class="footer-info">AI Sight v1.0 · <span id="ai-mode-label">纯前端</span> · 零 API 成本</span>
   </footer>
+
+  <!-- AI 设置弹窗 -->
+  <div class="modal-overlay" id="modal-settings" style="display:none">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h3>⚙️ AI 模型设置</h3>
+        <button class="modal-close" id="modal-close-settings">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-intro">
+          <p>配置 AI 模型后，可使用真实 AI 生成更智能的提示词。支持 DeepSeek、OpenRouter、Ollama 等多种后端。</p>
+        </div>
+        
+        <!-- 启用开关 -->
+        <div class="settings-row">
+          <label class="settings-label">
+            <input type="checkbox" id="ai-enabled">
+            <span>启用 AI 增强模式</span>
+          </label>
+          <span class="settings-hint">关闭时使用本地模拟（无需 API）</span>
+        </div>
+
+        <!-- Provider 选择 -->
+        <div class="settings-section">
+          <div class="settings-section-title">选择 AI 提供商</div>
+          <div class="provider-grid">
+            <label class="provider-card selected" data-provider="deepseek">
+              <input type="radio" name="provider" value="deepseek" checked>
+              <div class="provider-color" style="background:#0066FF"></div>
+              <div class="provider-info">
+                <div class="provider-name">DeepSeek</div>
+                <div class="provider-desc">500万token免费额度</div>
+              </div>
+            </label>
+            <label class="provider-card" data-provider="openrouter">
+              <input type="radio" name="provider" value="openrouter">
+              <div class="provider-color" style="background:#7C3AED"></div>
+              <div class="provider-info">
+                <div class="provider-name">OpenRouter</div>
+                <div class="provider-desc">30+免费模型</div>
+              </div>
+            </label>
+            <label class="provider-card" data-provider="ollama">
+              <input type="radio" name="provider" value="ollama">
+              <div class="provider-color" style="background:#10B981"></div>
+              <div class="provider-info">
+                <div class="provider-name">Ollama 本地</div>
+                <div class="provider-desc">完全免费离线</div>
+              </div>
+            </label>
+            <label class="provider-card" data-provider="openai">
+              <input type="radio" name="provider" value="openai">
+              <div class="provider-color" style="background:#10A37F"></div>
+              <div class="provider-info">
+                <div class="provider-name">OpenAI</div>
+                <div class="provider-desc">官方API</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- API Key 输入 -->
+        <div class="settings-section" id="section-apikey">
+          <div class="settings-section-title">API Key</div>
+          <input type="password" id="ai-apikey" class="settings-input" placeholder="输入 API Key（仅本地存储，不会上传）">
+          <div class="settings-hint">API Key 仅保存在浏览器本地，不会发送到任何服务器</div>
+        </div>
+
+        <!-- 模型选择 -->
+        <div class="settings-section" id="section-model">
+          <div class="settings-section-title">选择模型</div>
+          <select id="ai-model" class="settings-select">
+            <option value="">使用默认模型</option>
+          </select>
+          <div class="settings-hint" id="model-hint">DeepSeek Chat（通用对话）</div>
+        </div>
+
+        <!-- 连接测试 -->
+        <div class="settings-actions">
+          <button class="btn btn-secondary" id="btn-test-connection">🔗 测试连接</button>
+          <button class="btn btn-primary" id="btn-save-settings">💾 保存设置</button>
+        </div>
+
+        <!-- 测试结果 -->
+        <div class="test-result" id="test-result" style="display:none">
+          <span id="test-result-text"></span>
+        </div>
+
+        <!-- 接入指南 -->
+        <div class="settings-guide">
+          <div class="guide-toggle" id="guide-toggle">📖 查看接入指南</div>
+          <div class="guide-content" id="guide-content" style="display:none">
+            <div class="guide-item">
+              <h4>DeepSeek（推荐）</h4>
+              <ol>
+                <li>访问 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a></li>
+                <li>注册账号并登录</li>
+                <li>在「API Keys」页面创建新的 Key</li>
+                <li>复制 Key 并粘贴到上方输入框</li>
+              </ol>
+              <p class="guide-tip">✨ 新用户注册赠送 500 万 token 额度</p>
+            </div>
+            <div class="guide-item">
+              <h4>OpenRouter</h4>
+              <ol>
+                <li>访问 <a href="https://openrouter.ai" target="_blank">openrouter.ai</a></li>
+                <li>使用 Google/GitHub 账号登录</li>
+                <li>在 Keys 页面创建新的 API Key</li>
+                <li>复制并粘贴到上方输入框</li>
+              </ol>
+              <p class="guide-tip">✨ 提供 30+ 免费模型，无需信用卡</p>
+            </div>
+            <div class="guide-item">
+              <h4>Ollama 本地部署</h4>
+              <ol>
+                <li>从 <a href="https://ollama.com" target="_blank">ollama.com</a> 下载安装 Ollama</li>
+                <li>打开终端运行 <code>ollama serve</code> 启动服务</li>
+                <li>下载模型：<code>ollama pull qwen3:4b</code></li>
+                <li>API Key 留空即可</li>
+              </ol>
+              <p class="guide-tip">💡 需要 4GB 以上显存，建议 Qwen3-4B 模型</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 工作原理弹窗 -->
   <div class="modal-overlay" id="modal-how" style="display:none">
@@ -454,10 +636,11 @@
     </div>
   </div>
 
+  <script src="js/ai-provider.js"></script>
+  <script src="js/agents.js"></script>
+  <script src="js/animation.js"></script>
   <script src="data/prompts.js"></script>
   <script src="data/templates.js"></script>
-  <script src="js/animation.js"></script>
-  <script src="js/agents.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

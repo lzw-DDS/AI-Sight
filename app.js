@@ -51,7 +51,6 @@
     btnImportMine: document.getElementById('btn-import-mine'),
     // 提交弹窗
     modalSubmit: document.getElementById('modal-submit'),
-    btnSubmitTemplate2: document.getElementById('btn-submit-template'),
     // 隐藏文件导入
     fileImport: document.getElementById('file-import'),
     // Tab 切换
@@ -98,6 +97,34 @@
 
   // ===== 当前模板子标签 =====
   let currentTplTab = 'official';
+
+  // ===== 新功能状态 =====
+  let currentPersona = 'director';          // 当前 Agent 人格
+  let isLightTheme = false;                  // 主题状态
+  let draftTimer = null;                     // 草稿保存定时器
+  const DRAFT_KEY = 'ai-sight-draft';        // 草稿存储 key
+  const GROUP_KEY = 'ai-sight-template-groups'; // 模板分组 key
+  let currentGroup = 'all';                   // 当前分组筛选
+  let currentGenerateResult = null;          // 当前生成结果（用于对比/雷达图）
+  let quickMode = false;                     // 快速模式开关
+
+  // ===== Agent 人格描述映射 =====
+  const PERSONA_MAP = {
+    director: { label: '🎬 导演', color: '#6366f1', style: '电影级叙事，构图讲究，色调统一' },
+    planner: { label: '🎮 策划', color: '#8b5cf6', style: '游戏化思维，场景完整，数值明确' },
+    writer: { label: '✍️ 作者', color: '#a78bfa', style: '文学性强，情感丰富，叙事层层递进' },
+    artist: { label: '🖌️ 美术', color: '#c084fc', style: '视觉冲击强，色彩独特，细节丰富' }
+  };
+
+  // ===== 雷达图维度定义 =====
+  const RADAR_DIMS = [
+    { label: '主体描述', key: 'hasSubject' },
+    { label: '风格关键词', key: 'hasStyle' },
+    { label: '光照效果', key: 'hasLighting' },
+    { label: '镜头构图', key: 'hasCamera' },
+    { label: '参数完整', key: 'hasParams' },
+    { label: '模型版本', key: 'hasVersion' },
+  ];
 
   // ===== 模式切换 =====
   function switchMode(mode) {
@@ -149,6 +176,7 @@
 
   // ===== 初始化 =====
   function init() {
+    try {
     // 模式切换
     dom.modeBtns.forEach(btn => {
       btn.addEventListener('click', () => switchMode(btn.getAttribute('data-mode')));
@@ -259,7 +287,254 @@
     dom.btnExportAll.addEventListener('click', exportAll);
     dom.btnReset.addEventListener('click', resetAll);
 
+    // ===== 新功能：主题切换 =====
+    const savedTheme = localStorage.getItem('ai-sight-theme');
+    if (savedTheme === 'light') {
+      isLightTheme = true;
+      document.body.classList.add('light-theme');
+      document.getElementById('btn-theme').textContent = '☀️';
+    }
+    document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+
+    // ===== 新功能：Agent 人格选择 =====
+    document.querySelectorAll('.persona-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.persona-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentPersona = chip.getAttribute('data-persona');
+        const info = PERSONA_MAP[currentPersona];
+        updateFooter(`${info.label} 模式已激活 · ${info.style}`);
+      });
+    });
+
+    // ===== 新功能：快捷键支持 =====
+    document.addEventListener('keydown', handleKeyboard);
+
+    // ===== 新功能：草稿自动保存 =====
+    loadDraft(); // 启动时恢复草稿
+    const inputEl = dom.userInput;
+    inputEl.addEventListener('input', () => {
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(saveDraft, 1500);
+      showDraftIndicator(false);
+    });
+
+    // ===== 新功能：复制全部按钮 =====
+    document.getElementById('btn-copy-all').addEventListener('click', copyAllPrompts);
+
+    // ===== 新功能：对比模式按钮 =====
+    document.getElementById('btn-compare').addEventListener('click', openCompareMode);
+    document.getElementById('btn-close-compare').addEventListener('click', closeCompareMode);
+
+    // ===== 新功能：历史搜索 =====
+    document.getElementById('history-search-input').addEventListener('input', filterHistory);
+
+    // ===== 新功能：模板分组 =====
+    document.getElementById('btn-new-group').addEventListener('click', createNewGroup);
+    document.getElementById('template-groups').addEventListener('click', e => {
+      const btn = e.target.closest('.group-btn');
+      if (!btn) return;
+      document.querySelectorAll('.group-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentGroup = btn.getAttribute('data-group');
+      renderMineTemplates();
+    });
+    loadTemplateGroups();
+
+    // ===== 新功能：快速模式切换 =====
+    const quickToggle = document.getElementById('quick-mode-toggle');
+    quickToggle.addEventListener('change', () => {
+      quickMode = quickToggle.checked;
+      localStorage.setItem('ai-sight-quick-mode', quickMode ? '1' : '0');
+      updateFooter(quickMode ? '⚡ 快速模式已开启 · 直接输出，跳过动画' : '📺 完整模式 · 展示 Agent 协作流程');
+    });
+    // 恢复快速模式状态
+    if (localStorage.getItem('ai-sight-quick-mode') === '1') {
+      quickMode = true;
+      quickToggle.checked = true;
+    }
+
+    // ===== 新功能：拖拽导入支持 =====
+    const mineArea = document.getElementById('area-tpl-mine');
+    mineArea.addEventListener('dragover', e => {
+      e.preventDefault();
+      mineArea.classList.add('drag-over');
+    });
+    mineArea.addEventListener('dragleave', () => mineArea.classList.remove('drag-over'));
+    mineArea.addEventListener('drop', handleDragDrop);
+
+    // ===== AI 设置弹窗初始化 =====
+    initAISettings();
+
     updateFooter('就绪 · 输入创作需求后点击「启动 Agent 协作」');
+    } catch (err) {
+      console.error('[AI Sight] 初始化错误：', err);
+      updateFooter('⚠️ 初始化完成，部分功能可能受限');
+    }
+  }
+
+  // ===== AI 设置弹窗功能 =====
+  function initAISettings() {
+    const modalSettings = document.getElementById('modal-settings');
+    const btnSettings = document.getElementById('btn-settings');
+    const btnCloseSettings = document.getElementById('modal-close-settings');
+    const btnTestConnection = document.getElementById('btn-test-connection');
+    const btnSaveSettings = document.getElementById('btn-save-settings');
+    const guideToggle = document.getElementById('guide-toggle');
+    const guideContent = document.getElementById('guide-content');
+
+    // 打开设置弹窗
+    btnSettings.addEventListener('click', () => {
+      loadSettingsUI();
+      modalSettings.style.display = 'flex';
+    });
+
+    // 关闭设置弹窗
+    btnCloseSettings.addEventListener('click', () => {
+      modalSettings.style.display = 'none';
+    });
+    modalSettings.addEventListener('click', e => {
+      if (e.target === modalSettings) modalSettings.style.display = 'none';
+    });
+
+    // Provider 选择
+    document.querySelectorAll('.provider-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        card.querySelector('input').checked = true;
+        updateModelSelect(card.getAttribute('data-provider'));
+      });
+    });
+
+    // 测试连接
+    btnTestConnection.addEventListener('click', testAIConnection);
+
+    // 保存设置
+    btnSaveSettings.addEventListener('click', saveAISettings);
+
+    // 指南展开/收起
+    guideToggle.addEventListener('click', () => {
+      const isHidden = guideContent.style.display === 'none';
+      guideContent.style.display = isHidden ? 'block' : 'none';
+      guideToggle.textContent = isHidden ? '📖 收起接入指南' : '📖 查看接入指南';
+    });
+  }
+
+  // ===== 加载设置 UI =====
+  function loadSettingsUI() {
+    const config = AIProvider.config;
+    
+    // 启用开关
+    document.getElementById('ai-enabled').checked = config.enabled;
+    
+    // Provider 选择
+    document.querySelectorAll('.provider-card').forEach(card => {
+      const isSelected = card.getAttribute('data-provider') === config.provider;
+      card.classList.toggle('selected', isSelected);
+      card.querySelector('input').checked = isSelected;
+    });
+    
+    // API Key
+    document.getElementById('ai-apikey').value = config.apiKey || '';
+    
+    // 模型选择
+    updateModelSelect(config.provider);
+    document.getElementById('ai-model').value = config.model || '';
+    
+    // 更新底部显示
+    updateAIModeLabel();
+  }
+
+  // ===== 更新模型选择器 =====
+  function updateModelSelect(provider) {
+    const models = AIProvider.providers[provider]?.models || [];
+    const modelSelect = document.getElementById('ai-model');
+    const modelHint = document.getElementById('model-hint');
+    const sectionApikey = document.getElementById('section-apikey');
+    
+    modelSelect.innerHTML = '<option value="">使用默认模型</option>';
+    models.forEach(m => {
+      modelSelect.innerHTML += `<option value="${m}">${m}</option>`;
+    });
+    
+    // 更新提示
+    if (modelHint) {
+      const providerInfo = AIProvider.providers[provider];
+      modelHint.textContent = providerInfo?.description || '';
+    }
+    
+    // Ollama 不需要 API Key
+    sectionApikey.style.display = provider === 'ollama' ? 'none' : '';
+  }
+
+  // ===== 测试 AI 连接 =====
+  async function testAIConnection() {
+    const resultEl = document.getElementById('test-result');
+    const resultText = document.getElementById('test-result-text');
+    
+    resultEl.style.display = 'block';
+    resultEl.style.background = '#1e293b';
+    resultText.textContent = '🔄 测试连接中...';
+    
+    // 临时应用设置进行测试
+    const wasEnabled = AIProvider.config.enabled;
+    AIProvider.config.enabled = true;
+    
+    AIProvider.testConnection((success, message) => {
+      AIProvider.config.enabled = wasEnabled;
+      
+      if (success) {
+        resultEl.style.background = 'rgba(34, 197, 94, 0.1)';
+        resultText.innerHTML = `✅ <span style="color:#22c55e">${message}</span>`;
+      } else {
+        resultEl.style.background = 'rgba(239, 68, 68, 0.1)';
+        resultText.innerHTML = `❌ <span style="color:#ef4444">${message}</span>`;
+      }
+    });
+  }
+
+  // ===== 保存 AI 设置 =====
+  function saveAISettings() {
+    const enabled = document.getElementById('ai-enabled').checked;
+    const provider = document.querySelector('input[name="provider"]:checked')?.value || 'deepseek';
+    const apiKey = document.getElementById('ai-apikey').value.trim();
+    const model = document.getElementById('ai-model').value;
+    
+    // Ollama 不需要 API Key
+    if (provider === 'ollama' || !AIProvider.providers[provider]?.needApiKey) {
+      // 不检查 API Key
+    } else if (!apiKey) {
+      showToast('⚠️ 请输入 API Key', 'warning');
+      return;
+    }
+    
+    AIProvider.config = {
+      enabled,
+      provider,
+      apiKey,
+      model
+    };
+    AIProvider.saveConfig();
+    
+    // 更新底部状态
+    updateAIModeLabel();
+    
+    showToast('✅ AI 设置已保存', 'success');
+    document.getElementById('modal-settings').style.display = 'none';
+  }
+
+  // ===== 更新底部 AI 模式标签 =====
+  function updateAIModeLabel() {
+    const labelEl = document.getElementById('ai-mode-label');
+    if (AIProvider.isAvailable()) {
+      const provider = AIProvider.getCurrentProvider();
+      labelEl.textContent = `🤖 ${provider?.name || 'AI'}`;
+      labelEl.style.color = provider?.color || '#22c55e';
+    } else {
+      labelEl.textContent = '纯前端';
+      labelEl.style.color = '';
+    }
   }
 
   // ===== 渲染模板网格 =====
@@ -296,10 +571,6 @@
       card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id')));
     });
   }
-
-  // ===== 社区模板 Gist URL =====
-  const COMMUNITY_GIST_URL = 'https://gist.githubusercontent.com/lzw-DDS/d7bf5665a038c6a0a717fdea13fa622f/raw/community-templates.json';
-  const MINE_KEY = 'ai-sight-my-templates';
 
   let currentCommunityTemplates = [];
   let currentCommunityFilter = 'all';
@@ -586,13 +857,149 @@
     if (isRunning) return;
     isRunning = true;
     dom.btnRun.disabled = true;
-    dom.btnRun.innerHTML = '<span class="btn-icon">⏳</span> Agent 协作中...';
 
     // 重置界面
     resetPanels();
     Animation.resetNodes();
     Animation.resetAllStatus();
 
+    // ===== AI 增强模式 =====
+    if (AIProvider.isAvailable()) {
+      await runWithAI(input);
+      return;
+    }
+
+    // ===== 本地模拟模式 =====
+    startLocalFlow(input);
+  }
+
+  // ===== AI 增强模式运行 =====
+  async function runWithAI(input) {
+    updateFooter('🤖 AI 增强模式启动中...');
+    dom.btnRun.innerHTML = '<span class="btn-icon">🤖</span> AI 生成中...';
+    
+    try {
+      // 显示 AI 状态
+      dom.contentUnderstand.innerHTML = '<div class="ai-loading"><span class="tpl-spinner">⟳</span> 正在调用 AI...</div>';
+      dom.contentGenerate.innerHTML = '<div class="ai-loading"><span class="tpl-spinner">⟳</span> 分析需求并生成提示词...</div>';
+      
+      // 构建 AI 请求（添加 Agent 人格提示）
+      const persona = PERSONA_MAP[currentPersona];
+      const enhancedInput = `[${persona.label} 模式] ${persona.style}\n\n用户需求：${input}`;
+
+      // 调用 AI
+      const aiResult = await AIProvider.callAsync(enhancedInput);
+      
+      if (aiResult && aiResult.mj) {
+        // AI 返回了有效结果
+        dom.contentUnderstand.innerHTML = `<div style="color:#22c55e">✅ AI 分析完成</div>
+<div style="color:#94a3b8;font-size:12px;margin-top:6px">
+• 情感基调：${aiResult.analysis?.emotion || '综合'}\n
+• 视觉风格：${aiResult.analysis?.style || '电影质感'}\n
+• 核心主题：${aiResult.analysis?.theme || '待定义'}
+</div>`;
+
+        dom.contentGenerate.innerHTML = `<div style="color:#22c55e">✅ AI 提示词生成完成</div>
+<div style="color:#94a3b8;font-size:12px;margin-top:6px">✨ 由 AI 智能生成，质量更高</div>`;
+
+        dom.contentExecute.innerHTML = `<div style="color:#22c55e">✅ 就绪</div>
+<div style="color:#94a3b8;font-size:12px;margin-top:6px">🤖 AI 增强 · ${AIProvider.getCurrentProvider()?.name || 'AI'}</div>`;
+
+        // 填充提示词
+        dom.promptMj.textContent = aiResult.mj || '';
+        dom.promptKling.textContent = aiResult.kling || '';
+        dom.promptSuno.textContent = aiResult.suno || '';
+
+        // 更新状态
+        currentData = {
+          input,
+          mj: aiResult.mj,
+          kling: aiResult.kling,
+          suno: aiResult.suno,
+          source: 'ai',
+          provider: AIProvider.config.provider
+        };
+
+        updateFooter('✅ AI 生成完成 · 提示词已就绪');
+        dom.btnRun.innerHTML = '<span class="btn-icon">🔄</span> 重新生成';
+        isRunning = false;
+        dom.btnRun.disabled = false;
+        switchTab('mj');
+
+        // 保存历史
+        if (currentData && currentData.input) {
+          saveToHistory({ input: currentData.input, category: 'generate' });
+          clearDraft();
+        }
+      } else {
+        throw new Error('AI 返回格式异常');
+      }
+    } catch (err) {
+      console.error('[AI Sight] AI 生成异常：', err);
+      updateFooter(`⚠️ AI 调用失败：${err.message}，切换本地模拟`);
+      dom.btnRun.innerHTML = '<span class="btn-icon">🔄</span> 重试';
+      isRunning = false;
+      dom.btnRun.disabled = false;
+      // 降级到本地模拟
+      startLocalFlow(input);
+    }
+  }
+
+  // ===== 本地模拟模式 =====
+  async function startLocalFlow(input) {
+    // ===== 快速模式：直接输出，跳过动画 =====
+    if (quickMode) {
+      updateFooter('⚡ 快速生成中...');
+      dom.btnRun.innerHTML = '<span class="btn-icon">⚡</span> 生成中...';
+      try {
+        const understandResult = AgentSimulator.understandAgent(input);
+        const genResult = AgentSimulator.generateAgent(understandResult.result);
+        const execResult = AgentSimulator.executeAgent(genResult.result);
+
+        // 直接填充结果
+        dom.contentUnderstand.innerHTML = `<div style="color:#22c55e">✅ 需求解析完成</div><div style="color:#94a3b8;font-size:12px;margin-top:6px">关键词：${understandResult.result.keywords.join('、')}</div>`;
+        dom.contentGenerate.innerHTML = `<div style="color:#22c55e">✅ 提示词生成完成</div><div style="color:#94a3b8;font-size:12px;margin-top:6px">${genResult.result.variations.length} 个方案已生成</div>`;
+        dom.contentExecute.innerHTML = `<div style="color:#22c55e">✅ 执行完成</div>`;
+
+        dom.promptMj.textContent = genResult.result.mjPrompt;
+        dom.promptKling.textContent = genResult.result.klingPrompt;
+        dom.promptSuno.textContent = genResult.result.sunoPrompt;
+        dom.contentSummary.innerHTML = formatReport(execResult.result.report);
+
+        currentData = {
+          input,
+          mj: genResult.result.mjPrompt,
+          kling: genResult.result.klingPrompt,
+          suno: genResult.result.sunoPrompt,
+          report: execResult.result.report,
+          variations: genResult.result.variations
+        };
+
+        const analyzeResult = AgentSimulator.analyzePrompt(genResult.result.mjPrompt);
+        if (analyzeResult) drawRadarChart(analyzeResult);
+
+        updateFooter('✅ 生成完成 · 可复制或导出提示词');
+        dom.btnRun.disabled = false;
+        dom.btnRun.innerHTML = '<span class="btn-icon">🔄</span> 重新生成';
+        isRunning = false;
+        switchTab('mj');
+
+        if (currentData && currentData.input) {
+          saveToHistory({ input: currentData.input, category: 'generate' });
+          clearDraft();
+        }
+      } catch (err) {
+        console.error('[AI Sight] 快速生成异常：', err);
+        updateFooter('❌ 生成出现异常，请刷新后重试');
+        dom.btnRun.disabled = false;
+        dom.btnRun.innerHTML = '<span class="btn-icon">▶</span> 启动 Agent 协作';
+        isRunning = false;
+      }
+      return;
+    }
+
+    // ===== 完整模式：展示动画流程 =====
+    dom.btnRun.innerHTML = '<span class="btn-icon">⏳</span> Agent 协作中...';
     updateFooter('🤖 Agent 协作启动中...');
 
     try {
@@ -672,6 +1079,12 @@
       report: execResult.result.report,
       variations: genResult.result.variations
     };
+
+    // 绘制雷达图
+    const analyzeResult = AgentSimulator.analyzePrompt(genResult.result.mjPrompt);
+    if (analyzeResult) {
+      drawRadarChart(analyzeResult);
+    }
 
     updateFooter('✅ 全部完成 · 可复制或导出提示词');
     dom.btnRun.disabled = false;
@@ -1304,8 +1717,355 @@ ${currentData.report}
     // 生成完成后保存到历史记录
     if (currentData && currentData.input) {
       saveToHistory({ input: currentData.input, category: 'generate' });
+      clearDraft(); // 生成成功后清除草稿
     }
     return result;
+  };
+
+  // ==================== 新增功能 ====================
+
+  // ===== 主题切换 =====
+  function toggleTheme() {
+    isLightTheme = !isLightTheme;
+    document.body.classList.toggle('light-theme', isLightTheme);
+    const btn = document.getElementById('btn-theme');
+    btn.textContent = isLightTheme ? '☀️' : '🌙';
+    localStorage.setItem('ai-sight-theme', isLightTheme ? 'light' : 'dark');
+    showToast(isLightTheme ? '☀️ 浅色主题已启用' : '🌙 深色主题已启用');
+  }
+
+  // ===== 快捷键处理 =====
+  function handleKeyboard(e) {
+    // Ctrl+Enter 启动生成
+    if (e.ctrlKey && e.key === 'Enter') {
+      if (currentMode === 'generate' && !isRunning) startFlow();
+      if (currentMode === 'analyze') startAnalyze();
+      if (currentMode === 'convert') startConvert();
+    }
+    // Ctrl+1/2/3 切换模式
+    if (e.ctrlKey && e.key === '1') { switchMode('generate'); }
+    if (e.ctrlKey && e.key === '2') { switchMode('analyze'); }
+    if (e.ctrlKey && e.key === '3') { switchMode('convert'); }
+    // Ctrl+4 模板市场
+    if (e.ctrlKey && e.key === '4') { switchMode('templates'); }
+    // Escape 关闭弹窗
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+    }
+    // Ctrl+L 切换主题
+    if (e.ctrlKey && e.key === 'l') { e.preventDefault(); toggleTheme(); }
+  }
+
+  // ===== 草稿保存 =====
+  function saveDraft() {
+    const text = dom.userInput.value.trim();
+    if (!text) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      text,
+      timestamp: Date.now(),
+      persona: currentPersona
+    }));
+    showDraftIndicator(true);
+  }
+
+  function loadDraft() {
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (draft && draft.text && Date.now() - draft.timestamp < 86400000) { // 24小时内有效
+        dom.userInput.value = draft.text;
+        currentPersona = draft.persona || 'director';
+        // 更新人格选择器
+        document.querySelectorAll('.persona-chip').forEach(c => {
+          c.classList.toggle('active', c.getAttribute('data-persona') === currentPersona);
+        });
+        showDraftIndicator(true);
+      }
+    } catch {}
+  }
+
+  function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    document.getElementById('draft-indicator').style.display = 'none';
+  }
+
+  function showDraftIndicator(show) {
+    const indicator = document.getElementById('draft-indicator');
+    if (indicator) indicator.style.display = show ? '' : 'none';
+  }
+
+  // ===== 复制全部提示词 =====
+  function copyAllPrompts() {
+    if (!currentData) { showToast('⚠️ 请先生成提示词'); return; }
+    const content = `\
+═════════════════════════════
+  AI Sight · 全部提示词导出
+═════════════════════════════
+
+【原始需求】
+${currentData.input}
+
+────────── Midjourney ──────────
+${currentData.mj}
+
+────────── Kling 视频 ──────────
+${currentData.kling}
+
+────────── Suno 音乐 ──────────
+${currentData.suno}
+
+═════════════════════════════
+由 AI Sight 生成 · ${new Date().toLocaleString('zh-CN')}
+`;
+    copyText(content);
+  }
+
+  // ===== 雷达图绘制 =====
+  function drawRadarChart(score) {
+    const container = document.getElementById('score-radar');
+    const canvas = document.getElementById('radar-canvas');
+    if (!container || !canvas) return;
+
+    // 根据分析结果计算各维度得分
+    const dims = RADAR_DIMS;
+    const values = dims.map(d => {
+      const val = score.analysis[d.key];
+      return typeof val === 'boolean' ? (val ? 1 : 0.2) : (val ? Math.min(1, val / 100) : 0.2);
+    });
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = Math.min(cx, cy) - 30;
+    const n = dims.length;
+    const angleStep = (Math.PI * 2) / n;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制背景网格
+    for (let level = 1; level <= 3; level++) {
+      const levelR = (r * level) / 3;
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) {
+        const angle = i * angleStep - Math.PI / 2;
+        const x = cx + levelR * Math.cos(angle);
+        const y = cy + levelR * Math.sin(angle);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = 'rgba(99,102,241,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 绘制轴线
+    for (let i = 0; i < n; i++) {
+      const angle = i * angleStep - Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+      ctx.strokeStyle = 'rgba(99,102,241,0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // 标签
+      const lx = cx + (r + 18) * Math.cos(angle);
+      const ly = cy + (r + 18) * Math.sin(angle);
+      ctx.fillStyle = isLightTheme ? '#4a5568' : '#94a3b8';
+      ctx.font = '11px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(dims[i].label, lx, ly);
+    }
+
+    // 绘制数据区域
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const angle = i * angleStep - Math.PI / 2;
+      const x = cx + r * values[i] * Math.cos(angle);
+      const y = cy + r * values[i] * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gradient.addColorStop(0, 'rgba(99,102,241,0.4)');
+    gradient.addColorStop(1, 'rgba(139,92,246,0.15)');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // 绘制数据点
+    for (let i = 0; i < n; i++) {
+      const angle = i * angleStep - Math.PI / 2;
+      const x = cx + r * values[i] * Math.cos(angle);
+      const y = cy + r * values[i] * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#6366f1';
+      ctx.fill();
+    }
+
+    container.style.display = '';
+  }
+
+  // ===== 对比模式 =====
+  function openCompareMode() {
+    if (!currentData || !currentData.variations || currentData.variations.length < 2) {
+      showToast('⚠️ 需要至少 2 个方案才能对比');
+      return;
+    }
+    const container = document.getElementById('compare-mode');
+    const a = document.getElementById('compare-a');
+    const b = document.getElementById('compare-b');
+    const v1 = currentData.variations[0];
+    const v2 = currentData.variations[1];
+    a.innerHTML = `<div class="compare-col-title">${v1.label}</div><pre>${escapeForHtml(v1.mj)}</pre><br><strong>🎬 Kling</strong><br><pre>${escapeForHtml(v1.kling)}</pre><br><strong>🎵 Suno</strong><br><pre>${escapeForHtml(v1.suno)}</pre>`;
+    b.innerHTML = `<div class="compare-col-title">${v2.label}</div><pre>${escapeForHtml(v2.mj)}</pre><br><strong>🎬 Kling</strong><br><pre>${escapeForHtml(v2.kling)}</pre><br><strong>🎵 Suno</strong><br><pre>${escapeForHtml(v2.suno)}</pre>`;
+    container.style.display = '';
+    switchTab('summary');
+  }
+
+  function closeCompareMode() {
+    document.getElementById('compare-mode').style.display = 'none';
+  }
+
+  // ===== 历史搜索过滤 =====
+  function filterHistory() {
+    const keyword = document.getElementById('history-search-input').value.trim().toLowerCase();
+    const list = document.getElementById('history-list');
+    list.querySelectorAll('.history-item').forEach(item => {
+      const text = item.querySelector('.history-item-text').textContent.toLowerCase();
+      item.style.display = keyword && !text.includes(keyword) ? 'none' : '';
+    });
+  }
+
+  // ===== 模板分组 =====
+  function getTemplateGroups() {
+    try { return JSON.parse(localStorage.getItem(GROUP_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveTemplateGroups(groups) {
+    localStorage.setItem(GROUP_KEY, JSON.stringify(groups));
+  }
+
+  function loadTemplateGroups() {
+    const groups = getTemplateGroups();
+    const container = document.getElementById('template-groups');
+    const mine = getMyTemplates();
+    let html = '<button class="group-btn active" data-group="all">全部 <span class="group-count">(' + mine.length + ')</span></button>';
+    groups.forEach(g => {
+      const count = mine.filter(t => t.group === g.id).length;
+      html += `<button class="group-btn" data-group="${g.id}">${g.name} <span class="group-count">(${count})</span></button>`;
+    });
+    container.innerHTML = html;
+  }
+
+  function createNewGroup() {
+    const name = prompt('输入新分组名称：');
+    if (!name || !name.trim()) return;
+    const groups = getTemplateGroups();
+    const id = 'group-' + Date.now();
+    groups.push({ id, name: name.trim() });
+    saveTemplateGroups(groups);
+    loadTemplateGroups();
+    showToast(`📁 分组「${name.trim()}」已创建`);
+  }
+
+  // 增强版 renderMineTemplates 支持分组筛选
+  const originalRenderMineTemplatesFn = renderMineTemplates;
+  renderMineTemplates = function() {
+    const mine = getMyTemplates();
+    const filtered = currentGroup === 'all' ? mine : mine.filter(t => t.group === currentGroup);
+    if (!filtered.length) {
+      dom.mineGrid.innerHTML = `<div class="tpl-empty">${currentGroup === 'all' ? '还没有收藏任何模板，去社区找找吧！' : '该分组暂无模板'}</div>`;
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    filtered.forEach(t => {
+      const tags = (t.tags || []).map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card template-card-mine" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}</div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <div class="tpl-card-actions">
+    <button class="tpl-preview-btn" data-id="${t.id}" title="预览">👁️</button>
+    <button class="tpl-remove-btn" data-id="${t.id}" title="移除">✕</button>
+    <button class="tpl-use-btn" data-id="${t.id}">使用</button>
+  </div>
+</div>`;
+    });
+    dom.mineGrid.innerHTML = html;
+
+    dom.mineGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); loadTemplate(btn.getAttribute('data-id'), filtered); });
+    });
+    dom.mineGrid.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tpl = filtered.find(t => t.id === btn.getAttribute('data-id'));
+        if (tpl) openTemplatePreview(tpl, filtered);
+      });
+    });
+    dom.mineGrid.querySelectorAll('.tpl-remove-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        removeFromMyTemplates(btn.getAttribute('data-id'));
+        loadTemplateGroups(); // 刷新分组计数
+      });
+    });
+    dom.mineGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id'), filtered));
+    });
+  };
+
+  // ===== 拖拽导入 =====
+  function handleDragDrop(e) {
+    e.preventDefault();
+    e.target.closest('#area-tpl-mine')?.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.name.endsWith('.json')) {
+      showToast('⚠️ 请拖入 JSON 文件');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        const templates = Array.isArray(imported) ? imported : (imported.templates || []);
+        let added = 0;
+        const mine = getMyTemplates();
+        templates.forEach(t => {
+          if (t.title && t.prompt && !mine.find(m => m.id === t.id)) {
+            mine.push({ ...t, savedAt: Date.now() });
+            added++;
+          }
+        });
+        localStorage.setItem(MINE_KEY, JSON.stringify(mine));
+        renderMineTemplates();
+        loadTemplateGroups();
+        showToast(`✅ 拖入成功，导入 ${added} 个模板`);
+      } catch {
+        showToast('❌ JSON 格式错误');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ===== 增强版保存到我的收藏（支持分组）=====
+  const originalSaveToMyTemplates = saveToMyTemplates;
+  saveToMyTemplates = function(tpl) {
+    const groups = getTemplateGroups();
+    if (groups.length > 0) {
+      const groupId = prompt('选择收藏到的分组（输入分组名）：\n' + groups.map(g => g.name).join('\n') + '\n\n直接确定将归入「默认」分组');
+      if (groupId !== null) {
+        tpl.group = groupId || null;
+      }
+    }
+    originalSaveToMyTemplates(tpl);
+    loadTemplateGroups();
   };
 
 })();

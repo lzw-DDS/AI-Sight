@@ -57,6 +57,7 @@
 - 📦 **一键导出** — 导出完整提示词包
 - 🎨 **深色科技感 UI** — SVG 动画流程图 + 流畅交互
 - 🔄 **纯本地运行** — 零 API 成本，零网络依赖，双击即用
+- 🤖 **AI 模型接入** — 支持 DeepSeek / OpenRouter / Ollama（可选）
 - 📚 **工作流模板市场** — 25+ 个内置模板，覆盖图像/视频/音乐/文案
 - 🌐 **社区模板库** — 连接 GitHub Gist，一键导入社区模板
 - ⭐ **收藏系统** — 收藏常用模板，快速调用
@@ -87,6 +88,7 @@
 │   └── style.css       # 深色科技感样式
 ├── js/
 │   ├── agents.js       # Agent 模拟逻辑
+│   ├── ai-provider.js  # AI 模型接入（DeepSeek/OpenRouter/Ollama）
 │   └── animation.js    # 动画效果
 ├── data/
 │   ├── prompts.js      # 提示词模板库
@@ -123,6 +125,68 @@ AI Sight 支持从 GitHub Gist 读取社区模板：
 - **功能**：一键导入社区模板 → ⭐ 收藏到本地 → 导出备份 JSON
 
 在「模板市场」模式中点击「🌐 社区模板库」即可使用。
+
+---
+
+## 🤖 AI 模型接入（可选）
+
+AI Sight 支持接入真实的 AI 模型来生成更智能的提示词。点击右上角「⚙️ 设置」即可配置。
+
+### 支持的 AI 提供商
+
+| 提供商 | 免费额度 | 说明 |
+|--------|----------|------|
+| **DeepSeek** | 500万 token | 推荐！性价比高，中文能力强 |
+| **OpenRouter** | 30+ 免费模型 | 支持 Claude/GPT 等，需注册 |
+| **Ollama 本地** | 无限 | 本地部署，完全免费离线 |
+
+### DeepSeek 接入指南（推荐）
+
+1. 访问 [platform.deepseek.com](https://platform.deepseek.com)
+2. 注册账号并登录
+3. 在「API Keys」页面创建新的 Key
+4. 复制 Key，在 AI Sight 设置中粘贴
+5. 选择 DeepSeek 提供商，保存设置
+
+### OpenRouter 接入指南
+
+1. 访问 [openrouter.ai](https://openrouter.ai)
+2. 使用 Google/GitHub 账号登录
+3. 在 Keys 页面创建新的 API Key
+4. 复制 Key，在 AI Sight 设置中粘贴
+5. 选择 OpenRouter 提供商，选择模型，保存设置
+
+### Ollama 本地部署指南
+
+适合有独立显卡（4GB+ 显存）的用户：
+
+1. 从 [ollama.com](https://ollama.com) 下载安装 Ollama
+2. 打开终端运行 `ollama serve` 启动服务
+3. 下载推荐模型：
+   ```bash
+   # 通用对话（推荐）
+   ollama pull qwen3:4b
+
+   # 更轻量（显存不足时）
+   ollama pull qwen2.5:1.5b
+   ```
+4. 在 AI Sight 设置中选择 Ollama 提供商，API Key 留空
+5. 保存设置即可使用
+
+### 配置说明
+
+- **API Key 安全**：Key 仅保存在浏览器本地 localStorage，不会发送到任何第三方服务器
+- **自动降级**：如果 AI 调用失败，会自动降级到本地模拟模式
+- **切换模式**：可以在设置中随时切换 AI 模式/本地模拟模式
+
+### 推荐配置
+
+| 使用场景 | 推荐方案 | 配置 |
+|----------|----------|------|
+| 日常使用 | DeepSeek API | 免费额度充足 |
+| 追求免费 | OpenRouter | 30+ 免费模型 |
+| 完全离线 | Ollama 本地 | 需要显卡 |
+| 尝鲜体验 | 本地模拟 | 无需配置 |
 
 ---
 
