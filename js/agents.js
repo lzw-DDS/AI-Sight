@@ -708,7 +708,7 @@ const AgentSimulator = {
   • Midjourney 提示词（1 组，含参数）
   • Kling 视频提示词（1 组，含镜头描述）
   • Suno 音乐提示词（1 组，含结构说明）
-  • 方案变体：${genResult.variations.length} 个
+  • 方案变体：${(genResult.variations && genResult.variations.length) || 1} 个
 
 💡 优化建议：
   • 可在 MJ 提示词末尾添加 --s 50 调整风格化程度

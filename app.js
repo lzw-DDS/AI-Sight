@@ -1130,7 +1130,9 @@
         dom.promptMj.textContent = genResult.result.mjPrompt;
         dom.promptKling.textContent = genResult.result.klingPrompt;
         dom.promptSuno.textContent = genResult.result.sunoPrompt;
-        dom.contentSummary.innerHTML = formatReport(execResult.result.report);
+
+        const report = execResult.result && execResult.result.report;
+        dom.contentSummary.innerHTML = report ? formatReport(report) : '<span style="color:#f59e0b">⚠️ 报告生成失败，请重试</span>';
 
         currentData = {
           input,
@@ -1230,7 +1232,8 @@
     Animation.setAgentStatus('execute', 'done', '✅ 完成');
 
     // 填充综合报告
-    dom.contentSummary.innerHTML = formatReport(execResult.result.report);
+    const reportText = execResult.result && execResult.result.report;
+    dom.contentSummary.innerHTML = reportText ? formatReport(reportText) : '<span style="color:#f59e0b">⚠️ 报告生成失败，请重试</span>';
 
     await Animation.sleep(300);
     await Animation.emitParticle('particle3');
