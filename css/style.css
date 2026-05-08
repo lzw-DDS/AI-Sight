@@ -357,6 +357,178 @@ textarea::placeholder {
   color: var(--text-muted);
 }
 
+/* ===== 世界观预设 ===== */
+.world-preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.preset-select {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.preset-select:focus {
+  border-color: var(--accent-understand);
+  outline: none;
+}
+
+.preset-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 200px;
+}
+
+/* ===== 批量生成 ===== */
+.batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.batch-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-generate);
+}
+
+.batch-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.batch-preview {
+  margin-top: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.batch-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(99,102,241,0.1);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.batch-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.batch-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.batch-item:last-child {
+  border-bottom: none;
+}
+
+.batch-item-num {
+  min-width: 24px;
+  height: 24px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.batch-item-num.done {
+  background: var(--success);
+  color: #fff;
+}
+
+.batch-item-num.pending {
+  background: var(--accent-understand);
+  color: #fff;
+}
+
+.batch-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-item-text {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.batch-item-result {
+  margin-top: 6px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.batch-item-copy {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.batch-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.batch-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(99,102,241,0.1);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.batch-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-secondary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.batch-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-understand), var(--accent-generate));
+  transition: width 0.3s;
+}
+
+.batch-progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
 /* ===== 中间：流程面板 ===== */
 .panel-flow {
   min-height: 0;

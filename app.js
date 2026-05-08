@@ -86,10 +86,21 @@
     // 操作按钮
     btnExportAll: document.getElementById('btn-export-all'),
     btnReset: document.getElementById('btn-reset'),
+    // 批量生成
+    areaBatch: document.getElementById('area-batch'),
+    batchInput: document.getElementById('batch-input'),
+    batchList: document.getElementById('batch-list'),
+    batchCount: document.getElementById('batch-count'),
+    btnBatchRun: document.getElementById('btn-batch-run'),
+    btnBatchAdd: document.getElementById('btn-batch-add'),
+    btnBatchTemplate: document.getElementById('btn-batch-template'),
+    // 世界观预设
+    worldPreset: document.getElementById('world-preset'),
+    presetHint: document.getElementById('preset-hint'),
   };
 
   // ===== 当前模式 =====
-  let currentMode = 'generate'; // 'generate' | 'analyze' | 'convert' | 'templates'
+  let currentMode = 'generate'; // 'generate' | 'analyze' | 'convert' | 'templates' | 'batch'
 
   // ===== 状态 =====
   let currentData = null;
@@ -136,6 +147,7 @@
     const isAnalyze = mode === 'analyze';
     const isConvert = mode === 'convert';
     const isTemplates = mode === 'templates';
+    const isBatch = mode === 'batch';
     dom.areaGenerate.style.display = isGenerate ? '' : 'none';
     dom.presetsGenerate.style.display = isGenerate ? '' : 'none';
     dom.btnRun.style.display = isGenerate ? '' : 'none';
@@ -144,6 +156,7 @@
     dom.areaConvert.style.display = isConvert ? '' : 'none';
     dom.btnConvert.style.display = isConvert ? '' : 'none';
     dom.areaTemplates.style.display = isTemplates ? '' : 'none';
+    dom.areaBatch.style.display = isBatch ? '' : 'none';
     if (isTemplates) {
       switchTplTab(currentTplTab);
     }
@@ -151,7 +164,8 @@
       generate: '就绪 · 输入创作需求后点击「启动 Agent 协作」',
       analyze: '就绪 · 粘贴提示词后点击「解析提示词」',
       convert: '就绪 · 选择源格式和目标格式，粘贴提示词后点击「转换格式」',
-      templates: '就绪 · 选择模板，一键加载到创作需求'
+      templates: '就绪 · 选择模板，一键加载到创作需求',
+      batch: '就绪 · 每行输入一个需求，支持批量生成'
     };
     updateFooter(msgs[mode] || '就绪');
   }
@@ -184,6 +198,12 @@
 
     // 生成模式：启动按钮
     dom.btnRun.addEventListener('click', startFlow);
+
+    // 初始化世界观预设
+    initWorldPresets();
+
+    // 批量生成：事件绑定
+    initBatchMode();
 
     // 解析模式：解析按钮
     dom.btnAnalyze.addEventListener('click', startAnalyze);
@@ -890,9 +910,10 @@
       dom.contentUnderstand.innerHTML = '<div class="ai-loading"><span class="tpl-spinner">⟳</span> 正在调用 AI...</div>';
       dom.contentGenerate.innerHTML = '<div class="ai-loading"><span class="tpl-spinner">⟳</span> 分析需求并生成提示词...</div>';
       
-      // 构建 AI 请求（添加 Agent 人格提示）
+      // 构建 AI 请求（添加世界观预设 + Agent 人格提示）
       const persona = PERSONA_MAP[currentPersona];
-      const enhancedInput = `[${persona.label} 模式] ${persona.style}\n\n用户需求：${input}`;
+      const worldContext = getWorldContext();
+      const enhancedInput = `${worldContext}[${persona.label} 模式] ${persona.style}\n\n用户需求：${input}`;
 
       // 调用 AI
       const aiResult = await AIProvider.callAsync(enhancedInput);
@@ -2211,6 +2232,169 @@ ${currentData.suno}
     }
     originalSaveToMyTemplates(tpl);
     loadTemplateGroups();
+  };
+
+  // ===== 初始化世界观预设 =====
+  function initWorldPresets() {
+    if (!dom.worldPreset) return;
+    
+    // 填充预设选项
+    const options = WORLD_PRESETS.map(p => 
+      `<option value="${p.id}">${p.icon} ${p.name}</option>`
+    ).join('');
+    dom.worldPreset.innerHTML = '<option value="">🌍 不使用世界观预设</option>' + options;
+
+    // 监听切换
+    dom.worldPreset.addEventListener('change', () => {
+      const presetId = dom.worldPreset.value;
+      if (presetId) {
+        const preset = WORLD_PRESETS.find(p => p.id === presetId);
+        if (preset) {
+          dom.presetHint.textContent = preset.desc;
+        }
+      } else {
+        dom.presetHint.textContent = '';
+      }
+    });
+  }
+
+  // ===== 获取带世界观上下文的输入 =====
+  function getWorldContext() {
+    const presetId = dom.worldPreset?.value;
+    if (!presetId) return '';
+    return getPresetContext(presetId);
+  }
+
+  // ===== 批量生成 =====
+  let batchItems = [];  // 批量任务列表
+  let batchRunning = false;
+
+  function initBatchMode() {
+    if (!dom.batchInput) return;
+
+    // 监听输入变化，更新预览
+    dom.batchInput.addEventListener('input', updateBatchPreview);
+
+    // 开始批量生成
+    dom.btnBatchRun?.addEventListener('click', startBatchGenerate);
+
+    // 添加新任务
+    dom.btnBatchAdd?.addEventListener('click', () => {
+      dom.batchInput.focus();
+    });
+
+    // 使用模板
+    dom.btnBatchTemplate?.addEventListener('click', () => {
+      dom.batchInput.value = `# 分镜脚本批量生成模板
+# 每行格式：序号：场景描述
+
+镜头1：废弃医院走廊，日光从破窗照入
+镜头2：幸存者在废墟中搜寻物资
+镜头3：远方传来不明嘶吼
+镜头4：发现同类留下的记号
+镜头5：夜幕降临，危险逼近`;
+      updateBatchPreview();
+    });
+
+    // 初始化预览
+    updateBatchPreview();
+  }
+
+  function updateBatchPreview() {
+    const text = dom.batchInput?.value || '';
+    const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+    batchItems = lines.map((line, i) => {
+      const existing = batchItems[i];
+      return {
+        text: line.trim(),
+        status: existing?.status || 'pending',
+        result: existing?.result || null
+      };
+    });
+
+    dom.batchCount.textContent = batchItems.length;
+
+    if (batchItems.length === 0) {
+      dom.batchList.innerHTML = '<div class="batch-empty">输入需求后自动预览</div>';
+      return;
+    }
+
+    dom.batchList.innerHTML = batchItems.map((item, i) => `
+      <div class="batch-item" data-index="${i}">
+        <div class="batch-item-num ${item.status === 'done' ? 'done' : item.status === 'running' ? 'pending' : ''}">${item.status === 'done' ? '✓' : i + 1}</div>
+        <div class="batch-item-content">
+          <div class="batch-item-text">${escapeHtml(item.text)}</div>
+          ${item.result ? `<div class="batch-item-result">${escapeHtml(item.result.mj.substring(0, 100))}...</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function startBatchGenerate() {
+    if (batchRunning || batchItems.length === 0) return;
+    
+    batchRunning = true;
+    dom.btnBatchRun.disabled = true;
+    dom.btnBatchRun.textContent = '⏳ 生成中...';
+
+    const worldContext = getWorldContext();
+
+    for (let i = 0; i < batchItems.length; i++) {
+      if (!batchRunning) break;
+      
+      batchItems[i].status = 'running';
+      updateBatchPreview();
+
+      try {
+        const input = worldContext + batchItems[i].text;
+        
+        if (AIProvider.isAvailable()) {
+          const result = await AIProvider.callAsync(input);
+          batchItems[i].result = result;
+          batchItems[i].status = 'done';
+        } else {
+          // 本地模拟模式
+          const understandResult = AgentSimulator.understandAgent(input);
+          const genResult = AgentSimulator.generateAgent(understandResult.result);
+          batchItems[i].result = {
+            mj: genResult.result.mjPrompt,
+            kling: genResult.result.klingPrompt,
+            suno: genResult.result.sunoPrompt
+          };
+          batchItems[i].status = 'done';
+        }
+      } catch (err) {
+        batchItems[i].status = 'pending';
+        console.error(`批量生成第 ${i + 1} 项失败：`, err);
+      }
+
+      updateBatchPreview();
+    }
+
+    batchRunning = false;
+    dom.btnBatchRun.disabled = false;
+    dom.btnBatchRun.textContent = '🚀 开始批量生成';
+    
+    updateFooter(`✅ 批量生成完成 · ${batchItems.filter(i => i.status === 'done').length}/${batchItems.length} 成功`);
+  }
+
+  // ===== 导出批量结果 =====
+  window.exportBatchResults = function() {
+    const doneItems = batchItems.filter(i => i.status === 'done');
+    if (doneItems.length === 0) {
+      showToast('没有可导出的结果');
+      return;
+    }
+
+    let content = '# AI Sight 批量生成结果\n\n';
+    doneItems.forEach((item, i) => {
+      content += `## ${i + 1}. ${item.text}\n\n`;
+      content += `### Midjourney\n\`\`\`\n${item.result.mj}\n\`\`\`\n\n`;
+      content += `### Kling\n\`\`\`\n${item.result.kling}\n\`\`\`\n\n`;
+      content += `### Suno\n\`\`\`\n${item.result.suno}\n\`\`\`\n\n---\n\n`;
+    });
+
+    downloadText(content, '批量生成结果.md');
   };
 
 })();

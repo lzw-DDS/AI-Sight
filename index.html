@@ -47,13 +47,40 @@
         <button class="mode-btn" data-mode="analyze">🔍 解析提示词</button>
         <button class="mode-btn" data-mode="convert">🔄 转换格式</button>
         <button class="mode-btn" data-mode="templates">📦 模板市场</button>
+        <button class="mode-btn" data-mode="batch">📋 批量生成</button>
       </div>
 
       <!-- 生成模式：需求输入 -->
       <div class="input-area" id="area-generate">
+        <!-- 世界观预设 -->
+        <div class="world-preset-bar">
+          <select id="world-preset" class="preset-select">
+            <option value="">🌍 不使用世界观预设</option>
+          </select>
+          <span class="preset-hint" id="preset-hint"></span>
+        </div>
         <textarea id="user-input" placeholder="描述你的创作需求...&#10;&#10;例如：&#10;- 制作一个科幻风格的分镜脚本&#10;- 生成末日世界观的设定文案"></textarea>
         <div class="input-tips">
           <span class="tip">💡 提示：描述越详细，生成的提示词越精准</span>
+        </div>
+      </div>
+
+      <!-- 批量生成模式 -->
+      <div class="input-area" id="area-batch" style="display:none">
+        <div class="batch-header">
+          <div class="batch-title">📋 批量生成</div>
+          <div class="batch-actions">
+            <button class="btn-sm" id="btn-batch-add">+ 添加</button>
+            <button class="btn-sm" id="btn-batch-template">📝 使用模板</button>
+          </div>
+        </div>
+        <textarea id="batch-input" placeholder="每行一个需求，支持批量处理...&#10;&#10;示例：&#10;镜头1：废弃医院走廊，日光从破窗照入&#10;镜头2：幸存者在废墟中搜寻物资&#10;镜头3：远方传来不明嘶吼..."></textarea>
+        <div class="batch-preview" id="batch-preview">
+          <div class="batch-preview-header">
+            <span>待生成：<strong id="batch-count">0</strong> 条</span>
+            <button class="btn-sm btn-accent" id="btn-batch-run">🚀 开始批量生成</button>
+          </div>
+          <div class="batch-list" id="batch-list"></div>
         </div>
       </div>
 
@@ -647,6 +674,7 @@
   <script src="js/animation.js"></script>
   <script src="data/prompts.js"></script>
   <script src="data/templates.js"></script>
+  <script src="data/presets.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
