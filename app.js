@@ -917,6 +917,10 @@
         dom.promptKling.textContent = aiResult.kling || '';
         dom.promptSuno.textContent = aiResult.suno || '';
 
+        // AI 评分
+        const scores = AIProvider.evaluatePrompt(aiResult, input);
+        showPromptScores(scores);
+
         // 更新状态
         currentData = {
           input,
@@ -949,6 +953,140 @@
       dom.btnRun.disabled = false;
       // 降级到本地模拟
       startLocalFlow(input);
+    }
+  }
+
+  // ===== 展示提示词评分 =====
+  function showPromptScores(scores) {
+    const container = document.getElementById('score-radar');
+    if (!container) return;
+
+    // 生成评分 HTML
+    const scoreHTML = `
+      <div class="score-cards">
+        <div class="score-card score-overall">
+          <div class="score-title">综合评分</div>
+          <div class="score-value">${scores.overall}</div>
+          <div class="score-label">${getScoreLevel(scores.overall)}</div>
+        </div>
+        <div class="score-card">
+          <div class="score-title">MJ</div>
+          <div class="score-value">${scores.mj.total}</div>
+          <div class="score-bar"><div class="score-fill" style="width:${scores.mj.total}%"></div></div>
+          ${scores.mj.issues.length ? `<div class="score-issue">⚠️ ${scores.mj.issues[0]}</div>` : ''}
+        </div>
+        <div class="score-card">
+          <div class="score-title">Kling</div>
+          <div class="score-value">${scores.kling.total}</div>
+          <div class="score-bar"><div class="score-fill" style="width:${scores.kling.total}%"></div></div>
+          ${scores.kling.issues.length ? `<div class="score-issue">⚠️ ${scores.kling.issues[0]}</div>` : ''}
+        </div>
+        <div class="score-card">
+          <div class="score-title">Suno</div>
+          <div class="score-value">${scores.suno.total}</div>
+          <div class="score-bar"><div class="score-fill" style="width:${scores.suno.total}%"></div></div>
+          ${scores.suno.issues.length ? `<div class="score-issue">⚠️ ${scores.suno.issues[0]}</div>` : ''}
+        </div>
+      </div>
+      ${scores.mj.suggestions.length || scores.kling.suggestions.length || scores.suno.suggestions.length ? `
+      <div class="score-suggestions">
+        <div class="score-suggestions-title">💡 优化建议</div>
+        ${[...scores.mj.suggestions, ...scores.kling.suggestions, ...scores.suno.suggestions].slice(0, 3).map(s => `<div class="score-suggestion">• ${s}</div>`).join('')}
+      </div>` : ''}
+    `;
+
+    container.innerHTML = scoreHTML;
+    container.style.display = 'block';
+
+    // 渲染雷达图
+    renderRadarChart(scores);
+  }
+
+  function getScoreLevel(score) {
+    if (score >= 85) return '优秀';
+    if (score >= 70) return '良好';
+    if (score >= 50) return '一般';
+    return '需改进';
+  }
+
+  function renderRadarChart(scores) {
+    const canvas = document.getElementById('radar-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.min(w, h) / 2 - 30;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // 雷达图数据
+    const dimensions = ['详细度', '风格', '参数', '创意'];
+    const mjValues = [scores.mj.detail / 25, scores.mj.style / 25, scores.mj.params / 25, scores.mj.creativity / 25];
+
+    // 画背景网格
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.2)';
+    ctx.lineWidth = 1;
+    for (let level = 1; level <= 4; level++) {
+      ctx.beginPath();
+      for (let i = 0; i <= 4; i++) {
+        const angle = (i * 90 - 90) * Math.PI / 180;
+        const dist = r * level / 4;
+        const x = cx + Math.cos(angle) * dist;
+        const y = cy + Math.sin(angle) * dist;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    // 画轴线
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * 90 - 90) * Math.PI / 180;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+      ctx.stroke();
+    }
+
+    // 画数据区域
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.3)';
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * 90 - 90) * Math.PI / 180;
+      const dist = r * mjValues[i];
+      const x = cx + Math.cos(angle) * dist;
+      const y = cy + Math.sin(angle) * dist;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 画数据点
+    ctx.fillStyle = '#6366f1';
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * 90 - 90) * Math.PI / 180;
+      const dist = r * mjValues[i];
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 画标签
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * 90 - 90) * Math.PI / 180;
+      const x = cx + Math.cos(angle) * (r + 18);
+      const y = cy + Math.sin(angle) * (r + 18);
+      ctx.fillText(dimensions[i], x, y);
     }
   }
 

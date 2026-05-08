@@ -348,6 +348,176 @@ const AIProvider = {
   },
 
   /**
+   * 评估提示词质量
+   * @param {Object} result - AI 生成的结果 { mj, kling, suno }
+   * @param {string} userInput - 用户原始输入
+   * @returns {Object} 评分结果
+   */
+  evaluatePrompt(result, userInput) {
+    const scores = {
+      mj: this._evaluateMJ(result.mj, userInput),
+      kling: this._evaluateKling(result.kling),
+      suno: this._evaluateSuno(result.suno),
+      overall: 0
+    };
+
+    // 综合评分（加权平均）
+    scores.overall = Math.round(
+      scores.mj.total * 0.4 +
+      scores.kling.total * 0.35 +
+      scores.suno.total * 0.25
+    );
+
+    return scores;
+  },
+
+  /**
+   * 评估 Midjourney 提示词
+   */
+  _evaluateMJ(prompt, userInput) {
+    const score = { detail: 0, style: 0, params: 0, creativity: 0, total: 0, issues: [], suggestions: [] };
+
+    if (!prompt) {
+      score.issues.push('MJ 提示词为空');
+      return score;
+    }
+
+    // 详细度（0-25分）
+    const wordCount = prompt.split(/\s+/).length;
+    if (wordCount > 30) score.detail = 25;
+    else if (wordCount > 20) score.detail = 20;
+    else if (wordCount > 10) score.detail = 12;
+    else {
+      score.detail = 5;
+      score.issues.push('MJ 提示词过于简短，建议增加更多细节描述');
+    }
+
+    // 风格关键词（0-25分）
+    const styleKeywords = ['cinematic', 'photorealistic', 'detailed', 'hyper', 'ultra', '8k', '4k', 'professional', 'dramatic', 'moody', 'atmospheric', 'volumetric', 'anamorphic', 'film grain'];
+    const styleMatches = styleKeywords.filter(k => prompt.toLowerCase().includes(k));
+    score.style = Math.min(25, styleMatches.length * 5 + 10);
+
+    // 参数完整性（0-25分）
+    const hasAR = /--ar\s+\d+:\d+/.test(prompt);
+    const hasV = /--v\s+\d+/.test(prompt);
+    const hasS = /--s\s+\d+/.test(prompt);
+    let paramScore = 0;
+    if (hasAR) paramScore += 10;
+    if (hasV) paramScore += 8;
+    if (hasS) paramScore += 7;
+    score.params = paramScore;
+
+    if (!hasAR) score.suggestions.push('缺少 --ar 参数，建议添加画幅比例如 --ar 16:9');
+    if (!hasV) score.suggestions.push('缺少 --v 参数，建议添加版本如 --v 6');
+    if (!hasS) score.suggestions.push('缺少 --s 参数，建议添加风格化程度如 --s 200');
+
+    // 创意性（0-25分）
+    const creativeWords = ['haunting', 'ethereal', 'gritty', 'surreal', 'serene', 'bleak', 'vibrant', 'ominous', 'mysterious', 'epic', 'intimate', 'vast', 'subtle', 'stark'];
+    const creativeMatches = creativeWords.filter(w => prompt.toLowerCase().includes(w));
+    score.creativity = Math.min(25, creativeMatches.length * 4 + 8);
+
+    // 如果直接复制原句
+    if (prompt.toLowerCase().includes(userInput.toLowerCase().substring(0, 5))) {
+      score.creativity -= 10;
+      score.issues.push('MJ 提示词疑似直接复制原句，建议完全重构');
+    }
+
+    score.total = Math.max(0, Math.min(100, score.detail + score.style + score.params + score.creativity));
+    return score;
+  },
+
+  /**
+   * 评估 Kling 提示词
+   */
+  _evaluateKling(prompt) {
+    const score = { structure: 0, camera: 0, visual: 0, lighting: 0, total: 0, issues: [], suggestions: [] };
+
+    if (!prompt) {
+      score.issues.push('Kling 提示词为空');
+      return score;
+    }
+
+    // 结构完整性（5个标签）
+    const tags = ['[Camera]', '[Duration]', '[Visual]', '[Lighting]', '[Style]'];
+    const foundTags = tags.filter(t => prompt.includes(t));
+    score.structure = foundTags.length * 12;
+
+    if (foundTags.length < 5) {
+      score.suggestions.push(`缺少 ${5 - foundTags.length} 个标签：${tags.filter(t => !prompt.includes(t)).join('、')}`);
+    }
+
+    // Camera 评估
+    if (prompt.includes('[Camera]')) {
+      const cameraPart = prompt.match(/\[Camera\]([\s\S]*?)(?=\[|$)/)?.[1] || '';
+      if (cameraPart.length > 30) score.camera = 20;
+      else if (cameraPart.length > 10) score.camera = 12;
+      else score.camera = 5;
+    }
+
+    // Visual 评估
+    if (prompt.includes('[Visual]')) {
+      const visualPart = prompt.match(/\[Visual\]([\s\S]*?)(?=\[|$)/)?.[1] || '';
+      if (visualPart.length > 50) score.visual = 20;
+      else if (visualPart.length > 20) score.visual = 12;
+      else score.visual = 5;
+    }
+
+    // Lighting 评估
+    if (prompt.includes('[Lighting]')) {
+      const lightingPart = prompt.match(/\[Lighting\]([\s\S]*?)(?=\[|$)/)?.[1] || '';
+      if (lightingPart.length > 20) score.lighting = 20;
+      else if (lightingPart.length > 10) score.lighting = 12;
+      else score.lighting = 5;
+    }
+
+    // Duration 评估
+    if (prompt.includes('[Duration]')) {
+      const durationPart = prompt.match(/\[Duration\]([\s\S]*?)(?=\[|$)/)?.[1] || '';
+      if (/\d+\s*seconds?/.test(durationPart) || /\d+s/.test(durationPart)) {
+        score.structure += 5; // 有具体时长加5分
+      }
+    }
+
+    score.total = Math.max(0, Math.min(100, score.structure + score.camera + score.visual + score.lighting));
+    return score;
+  },
+
+  /**
+   * 评估 Suno 提示词
+   */
+  _evaluateSuno(prompt) {
+    const score = { structure: 0, genre: 0, mood: 0, instrument: 0, total: 0, issues: [], suggestions: [] };
+
+    if (!prompt) {
+      score.issues.push('Suno 提示词为空');
+      return score;
+    }
+
+    // 结构完整性（5个标签）
+    const tags = ['[Genre]', '[Mood]', '[Instrument]', '[Tempo]', '[Vocals]'];
+    const foundTags = tags.filter(t => prompt.includes(t));
+    score.structure = foundTags.length * 10;
+
+    if (foundTags.length < 5) {
+      score.suggestions.push(`缺少 ${5 - foundTags.length} 个标签：${tags.filter(t => !prompt.includes(t)).join('、')}`);
+    }
+
+    // 各维度详细评估
+    ['genre', 'mood', 'instrument', 'tempo', 'vocals'].forEach(dim => {
+      const tagName = `[${dim.charAt(0).toUpperCase() + dim.slice(1)}]`;
+      if (prompt.includes(tagName)) {
+        const part = prompt.match(new RegExp(`${tagName}([\\s\\S]*?)(?=\\[|$)`))?.[1] || '';
+        if (part.length > 15) score[dim] = 8;
+        else if (part.length > 5) score[dim] = 5;
+        else score[dim] = 2;
+      }
+    });
+
+    score.total = Math.max(0, Math.min(100, score.structure + score.genre + score.mood + score.instrument + score.tempo + score.vocals));
+    return score;
+  },
+
+  /**
    * 导出配置（不包含 API Key）
    */
   exportConfig() {

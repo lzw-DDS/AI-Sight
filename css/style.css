@@ -1961,6 +1961,89 @@ body.light-theme .quick-mode-toggle input:checked + .toggle-slider {
   max-width: 100%;
 }
 
+/* ===== 评分卡片 ===== */
+.score-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.score-card {
+  background: rgba(99,102,241,0.1);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  text-align: center;
+}
+
+.score-card.score-overall {
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2));
+  border-color: rgba(99,102,241,0.4);
+}
+
+.score-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.score-label {
+  font-size: 10px;
+  color: var(--accent-generate);
+  margin-top: 2px;
+}
+
+.score-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.score-issue {
+  font-size: 9px;
+  color: var(--warning);
+  margin-top: 4px;
+  text-align: left;
+}
+
+.score-suggestions {
+  background: rgba(34,197,94,0.1);
+  border: 1px solid rgba(34,197,94,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.score-suggestions-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+  margin-bottom: 6px;
+}
+
+.score-suggestion {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 /* ===== 对比模式 ===== */
 .compare-mode {
   margin-top: 16px;
