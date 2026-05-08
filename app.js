@@ -4,6 +4,12 @@
 (function () {
   'use strict';
 
+  // ===== 常量 =====
+  const HISTORY_KEY = 'ai-sight-history';
+  const MAX_HISTORY = 50;
+  const MINE_KEY = 'ai-sight-my-templates';
+  const COMMUNITY_GIST_URL = 'https://gist.githubusercontent.com/lzw-DDS/d7bf5665a038c6a0a717fdea13fa622f/raw/community-templates.json';
+
   // ===== DOM 元素 =====
   const dom = {
     // 模式切换
@@ -226,6 +232,21 @@
     dom.modalCloseHow.addEventListener('click', () => { dom.modalHow.style.display = 'none'; });
     dom.modalHow.addEventListener('click', (e) => { if (e.target === dom.modalHow) dom.modalHow.style.display = 'none'; });
 
+    // 历史记录弹窗
+    document.getElementById('btn-history').addEventListener('click', openHistoryModal);
+    document.getElementById('modal-close-history').addEventListener('click', () => { document.getElementById('modal-history').style.display = 'none'; });
+    document.getElementById('modal-history').addEventListener('click', (e) => { if (e.target.id === 'modal-history') document.getElementById('modal-history').style.display = 'none'; });
+    document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+
+    // 模板预览弹窗
+    document.getElementById('modal-close-preview').addEventListener('click', () => { document.getElementById('modal-preview').style.display = 'none'; });
+    document.getElementById('modal-preview').addEventListener('click', (e) => { if (e.target.id === 'modal-preview') document.getElementById('modal-preview').style.display = 'none'; });
+    document.getElementById('btn-preview-copy').addEventListener('click', copyPreviewPrompt);
+    document.getElementById('btn-preview-use').addEventListener('click', usePreviewTemplate);
+
+    // 初始化历史记录
+    currentHistory = getHistory();
+
     // 复制按钮
     dom.copyMj.addEventListener('click', () => copyText(dom.promptMj.textContent));
     dom.copyKling.addEventListener('click', () => copyText(dom.promptKling.textContent));
@@ -282,6 +303,9 @@
 
   let currentCommunityTemplates = [];
   let currentCommunityFilter = 'all';
+
+  // ===== 历史记录 =====
+  let currentHistory = [];
 
   // ===== 加载社区模板 =====
   async function loadCommunityTemplates() {
@@ -965,4 +989,323 @@ ${currentData.report}
 
   // ===== 启动 =====
   document.addEventListener('DOMContentLoaded', init);
+
+  // ===== 历史记录：读取 =====
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  // ===== 历史记录：保存 =====
+  function saveToHistory(entry) {
+    const history = getHistory();
+    history.unshift({ ...entry, timestamp: Date.now() });
+    if (history.length > MAX_HISTORY) history.pop();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    currentHistory = history;
+  }
+
+  // ===== 历史记录：删除单个 =====
+  function deleteHistoryItem(timestamp) {
+    let history = getHistory();
+    history = history.filter(h => h.timestamp !== timestamp);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    currentHistory = history;
+    renderHistoryList();
+    showToast('🗑️ 已删除');
+  }
+
+  // ===== 历史记录：清空 =====
+  function clearHistory() {
+    if (!currentHistory.length) { showToast('历史记录为空'); return; }
+    if (confirm('确定要清空所有历史记录吗？')) {
+      localStorage.setItem(HISTORY_KEY, '[]');
+      currentHistory = [];
+      renderHistoryList();
+      showToast('🗑️ 已清空全部历史记录');
+    }
+  }
+
+  // ===== 历史记录：打开弹窗 =====
+  function openHistoryModal() {
+    renderHistoryList();
+    document.getElementById('modal-history').style.display = 'flex';
+  }
+
+  // ===== 历史记录：渲染列表 =====
+  function renderHistoryList() {
+    const list = document.getElementById('history-list');
+    if (!currentHistory.length) {
+      list.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    currentHistory.forEach(h => {
+      const icon = iconMap[h.category] || '📝';
+      const time = formatTime(h.timestamp);
+      const preview = h.input ? h.input.slice(0, 60) + (h.input.length > 60 ? '...' : '') : h.prompt.slice(0, 60);
+      html += `<div class="history-item" data-input="${escapeForHtml(h.input || h.prompt || '')}">
+        <div class="history-item-icon">${icon}</div>
+        <div class="history-item-content">
+          <div class="history-item-text">${escapeForHtml(preview)}</div>
+          <div class="history-item-time">${time}</div>
+        </div>
+        <button class="history-item-delete" data-time="${h.timestamp}">✕</button>
+      </div>`;
+    });
+    list.innerHTML = html;
+
+    // 绑定点击事件
+    list.querySelectorAll('.history-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('history-item-delete')) return;
+        const input = item.getAttribute('data-input');
+        dom.userInput.value = decodeHtmlEntities(input);
+        document.getElementById('modal-history').style.display = 'none';
+        switchMode('generate');
+        showToast('📜 已加载历史记录');
+      });
+    });
+
+    list.querySelectorAll('.history-item-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteHistoryItem(parseInt(btn.getAttribute('data-time')));
+      });
+    });
+  }
+
+  // ===== 格式化时间 =====
+  function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+    return date.toLocaleDateString('zh-CN');
+  }
+
+  // ===== HTML 实体解码 =====
+  function decodeHtmlEntities(text) {
+    const div = document.createElement('div');
+    div.innerHTML = text;
+    return div.textContent;
+  }
+
+  // ===== 模板预览：打开 =====
+  let currentPreviewTemplate = null;
+
+  function openTemplatePreview(tpl, source) {
+    currentPreviewTemplate = { tpl, source };
+    const modal = document.getElementById('modal-preview');
+    document.getElementById('preview-title').textContent = tpl.title || '📋 模板预览';
+    document.getElementById('preview-meta').textContent = `分类：${getCategoryName(tpl.category)} | 作者：${tpl.author || '官方'}`;
+
+    const content = tpl.prompt || tpl.convertText || '';
+    document.getElementById('preview-content').textContent = content || '（无内容）';
+
+    // 转换模板特殊处理
+    const convertSection = document.getElementById('preview-convert-section');
+    if (tpl.category === 'convert') {
+      convertSection.style.display = 'block';
+      const fromName = { midjourney: 'Midjourney', kling: 'Kling', suno: 'Suno' }[tpl.convertFrom] || tpl.convertFrom;
+      const toName = { midjourney: 'Midjourney', kling: 'Kling', suno: 'Suno' }[tpl.convertTo] || tpl.convertTo;
+      document.getElementById('preview-convert-info').textContent = `${fromName} → ${toName}`;
+    } else {
+      convertSection.style.display = 'none';
+    }
+
+    // 标签
+    const tagsContainer = document.getElementById('preview-tags');
+    const tags = tpl.tags || [];
+    tagsContainer.innerHTML = tags.map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+
+    modal.style.display = 'flex';
+  }
+
+  function getCategoryName(category) {
+    const map = { video: '🎬 视频', image: '🖼️ 图像', music: '🎵 音乐', convert: '🔄 转换' };
+    return map[category] || category;
+  }
+
+  // ===== 模板预览：复制 =====
+  function copyPreviewPrompt() {
+    if (!currentPreviewTemplate) return;
+    const content = currentPreviewTemplate.tpl.prompt || currentPreviewTemplate.tpl.convertText || '';
+    copyText(content);
+    showToast('✅ 提示词已复制');
+  }
+
+  // ===== 模板预览：使用 =====
+  function usePreviewTemplate() {
+    if (!currentPreviewTemplate) return;
+    loadTemplate(currentPreviewTemplate.tpl.id, currentPreviewTemplate.source);
+    document.getElementById('modal-preview').style.display = 'none';
+  }
+
+  // ===== 增强版渲染模板网格（添加预览按钮）=====
+  const originalRenderTemplateGrid = renderTemplateGrid;
+  renderTemplateGrid = function(filter) {
+    const filtered = filter === 'all' ? TEMPLATES : TEMPLATES.filter(t => t.category === filter);
+    if (!filtered.length) {
+      dom.templateGrid.innerHTML = '<div class="template-empty">该分类暂无模板</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    filtered.forEach(t => {
+      const tags = t.tags.map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}</div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <button class="tpl-preview-btn" data-id="${t.id}" title="预览">👁️</button>
+  <button class="tpl-use-btn">使用</button>
+</div>`;
+    });
+    dom.templateGrid.innerHTML = html;
+
+    // 绑定事件
+    dom.templateGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        loadTemplate(btn.getAttribute('data-id'));
+      });
+    });
+    dom.templateGrid.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tpl = TEMPLATES.find(t => t.id === btn.getAttribute('data-id'));
+        if (tpl) openTemplatePreview(tpl, TEMPLATES);
+      });
+    });
+    dom.templateGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id')));
+    });
+  };
+
+  // ===== 增强版渲染社区模板（添加预览按钮）=====
+  const originalRenderCommunityGrid = renderCommunityGrid;
+  renderCommunityGrid = function(templates, filter) {
+    currentCommunityFilter = filter;
+    const filtered = filter === 'all' ? templates : templates.filter(t => t.category === filter);
+    if (!filtered.length) {
+      dom.communityGrid.innerHTML = '<div class="tpl-empty">该分类暂无社区模板</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    filtered.forEach(t => {
+      const tags = (t.tags || []).map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}<span class="tpl-author"> · ${t.author || '匿名'}</span></div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <div class="tpl-card-actions">
+    <button class="tpl-preview-btn" data-id="${t.id}" title="预览">👁️</button>
+    <button class="tpl-star-btn" data-id="${t.id}" title="收藏">⭐</button>
+    <button class="tpl-use-btn" data-id="${t.id}">使用</button>
+  </div>
+</div>`;
+    });
+    dom.communityGrid.innerHTML = html;
+
+    dom.communityGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); loadTemplate(btn.getAttribute('data-id'), currentCommunityTemplates); });
+    });
+    dom.communityGrid.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tpl = currentCommunityTemplates.find(t => t.id === btn.getAttribute('data-id'));
+        if (tpl) openTemplatePreview(tpl, currentCommunityTemplates);
+      });
+    });
+    dom.communityGrid.querySelectorAll('.tpl-star-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const tpl = currentCommunityTemplates.find(t => t.id === id);
+        if (tpl) {
+          saveToMyTemplates(tpl);
+          btn.textContent = '✅';
+          btn.disabled = true;
+        }
+      });
+    });
+    dom.communityGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id'), currentCommunityTemplates));
+    });
+  };
+
+  // ===== 增强版渲染我的收藏（添加预览按钮）=====
+  const originalRenderMineTemplates = renderMineTemplates;
+  renderMineTemplates = function() {
+    const mine = getMyTemplates();
+    if (!mine.length) {
+      dom.mineGrid.innerHTML = '<div class="tpl-empty">还没有收藏任何模板，去社区找找吧！</div>';
+      return;
+    }
+    const iconMap = { video: '🎬', image: '🖼️', music: '🎵', convert: '🔄' };
+    let html = '';
+    mine.forEach(t => {
+      const tags = (t.tags || []).map(tag => `<span class="tpl-tag">${tag}</span>`).join('');
+      const icon = iconMap[t.category] || '📦';
+      html += `<div class="template-card template-card-mine" data-id="${t.id}" data-category="${t.category}">
+  <div class="tpl-icon">${icon}</div>
+  <div class="tpl-body">
+    <div class="tpl-title">${t.title}</div>
+    <div class="tpl-desc">${t.description}</div>
+    <div class="tpl-tags">${tags}</div>
+  </div>
+  <div class="tpl-card-actions">
+    <button class="tpl-preview-btn" data-id="${t.id}" title="预览">👁️</button>
+    <button class="tpl-remove-btn" data-id="${t.id}" title="移除">✕</button>
+    <button class="tpl-use-btn" data-id="${t.id}">使用</button>
+  </div>
+</div>`;
+    });
+    dom.mineGrid.innerHTML = html;
+    dom.mineGrid.querySelectorAll('.tpl-use-btn').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); loadTemplate(btn.getAttribute('data-id'), mine); });
+    });
+    dom.mineGrid.querySelectorAll('.tpl-preview-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const tpl = mine.find(t => t.id === btn.getAttribute('data-id'));
+        if (tpl) openTemplatePreview(tpl, mine);
+      });
+    });
+    dom.mineGrid.querySelectorAll('.tpl-remove-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        removeFromMyTemplates(btn.getAttribute('data-id'));
+      });
+    });
+    dom.mineGrid.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => loadTemplate(card.getAttribute('data-id'), mine));
+    });
+  };
+
+  // ===== 保存到历史记录（在生成完成后调用）=====
+  const originalStartFlow = startFlow;
+  startFlow = async function() {
+    const result = await originalStartFlow.apply(this, arguments);
+    // 生成完成后保存到历史记录
+    if (currentData && currentData.input) {
+      saveToHistory({ input: currentData.input, category: 'generate' });
+    }
+    return result;
+  };
+
 })();

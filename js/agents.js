@@ -32,118 +32,184 @@ const AgentSimulator = {
   // 生成 Agent 模拟输出
   generateAgent(understandResult) {
     const { keywords, tasks } = understandResult;
-    const isEarthBreath = keywords.some(k => k.includes('地球') || k.includes('呼吸') || k.includes('earth'));
-    const isZombie = keywords.some(k => k.includes('丧尸') || k.includes('末日') || k.includes('僵尸'));
-    const isMinecraft = keywords.some(k => k.includes('minecraft') || k.includes('麦块') || k.includes('我的世界'));
+
+    // 多场景识别
+    const sceneMapping = {
+      cyberpunk: keywords.some(k => ['赛博朋克', 'cyberpunk', '霓虹', 'neon'].includes(k)),
+      nature: keywords.some(k => ['自然', '森林', '海洋', '生态', 'nature'].includes(k)),
+      space: keywords.some(k => ['宇宙', '太空', '星球', 'space', '宇宙'].includes(k)),
+      fantasy: keywords.some(k => ['奇幻', '魔法', '龙', 'fantasy', '魔法'].includes(k)),
+      horror: keywords.some(k => ['恐怖', '惊悚', '血腥', 'horror'].includes(k)),
+      anime: keywords.some(k => ['动漫', '二次元', 'anime', '日式'].includes(k)),
+      history: keywords.some(k => ['历史', '古代', '古典', '战争'].includes(k)),
+      scifi: keywords.some(k => ['科幻', '未来', '外星', 'sci-fi', '科技'].includes(k)),
+    };
+
+    // 深度场景组合
+    const deepSceneMapping = {
+      underwater: keywords.some(k => ['深海', '水下', '海洋生物'].includes(k)),
+      mountain: keywords.some(k => ['雪山', '登山', '高山'].includes(k)),
+      city: keywords.some(k => ['城市', '建筑', '街道'].includes(k)),
+      desert: keywords.some(k => ['沙漠', '戈壁', '荒漠'].includes(k)),
+      jungle: keywords.some(k => ['丛林', '雨林', '密林'].includes(k)),
+      ruins: keywords.some(k => ['废墟', '遗迹', '古代建筑'].includes(k)),
+    };
 
     let mjPrompt, klingPrompt, sunoPrompt;
     let variations = [];
+    let quality = 'A+';
 
-    if (isEarthBreath) {
-      mjPrompt = `\
-A cinematic overhead shot of planet Earth, glowing bioluminescent grid lines across continents, \
-atmosphere pulsing with soft blue and green energy, "breathing" motion implied by cloud layer undulation, \
-hyper-realistic, 8k, volumetric lighting, depth of field, cosmic scale --ar 16:9 --v 6 --style raw --c 20`;
-
-      klingPrompt = `\
-[Camera] Slow descending orbit from deep space to atmosphere
-[Duration] 8 seconds
-[Visual] Earth rotates slowly, bioluminescent grid lines pulse from pole to pole, cloud layers undulate like breathing
-[Lighting] Sunside warm gold, darkside city lights glow teal
-[Style] Photorealistic, IMAX quality, no text, no UI`;
-
-      sunoPrompt = `\
-[Genre] Cinematic Ambient Electronic
-[Mood] Awe-inspiring, mysterious, vast
-[Instrument] Deep synth pads, subtle strings, low Earth rumble, breath-like white noise
-[Structure] 60s intro build-up, 30s climax with choral swell, 30s gentle fade
-[Vocals] None, or wordless ethereal vocal chops
-[Tempo] 72 BPM, very slow, breathing rhythm`;
-
-      variations = [
-        { label: '方案 A（电影级写实）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt },
-        { label: '方案 B（抽象艺术风）', mj: mjPrompt.replace('hyper-realistic', 'abstract surrealist painting, Van Gogh starry night style'), kling: klingPrompt + '\n[Style] Oil painting animation, brush stroke visible', suno: sunoPrompt.replace('Cinematic Ambient Electronic', 'Neoclassical Contemporary') }
-      ];
-    } else if (isZombie) {
-      mjPrompt = `\
-A tense close-up of a survivor making eye contact with an infected, dramatic chiaroscuro lighting, \
-the infected's eyes reflecting a strange inner light, cinematic composition, post-apocalyptic urban decay background, \
-hyper-detailed, emotional intensity --ar 16:9 --v 6 --style raw --c 15`;
-
-      klingPrompt = `\
-[Camera] Extreme close-up, eyes only, then slow pullback to reveal full face
-[Duration] 6 seconds
-[Visual] Infected's eyes shimmer with unnatural intelligence, pupil dilates, reflection of the survivor visible
-[Lighting] Low key, single source from above, harsh shadows
-[Style] Gritty realism, desaturated with pops of sickly green`;
-
-      sunoPrompt = `\
-[Genre] Dark Ambient / Horror Soundtrack
-[Mood] Tense, dread, impending danger
-[Instrument] Low cello drones, metallic scratching sounds, distant coherent whispering
-[Structure] 45s slow build with heartbeat bass, 15s silence, 30s cacophony break
-[Tempo] 60 BPM, irregular rhythm`;
-
-      variations = [
-        { label: '方案 A（恐怖惊悚风）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt },
-        { label: '方案 B（情感剧情风）', mj: mjPrompt.replace('chiaroscuro', 'soft dramatic lighting, emotional'), kling: klingPrompt.replace('Gritty realism', 'Cinematic drama, emotional close-up'), suno: sunoPrompt.replace('Dark Ambient', 'Cinematic Orchestral Drama') }
-      ];
-    } else if (isMinecraft) {
-      mjPrompt = `\
-A custom Minecraft dimension portal room, glowing with purple and teal energy, \
-blocky aesthetic but with ray-traced lighting, custom mobs in background, \
-Minecraft promotional art style, vibrant colors, 4k --ar 16:9 --v 6 --style raw --c 10`;
-
-      klingPrompt = `\
-[Camera] First-person walkthrough, smooth gimbal movement
+    // 根据场景生成定制化提示词
+    if (sceneMapping.cyberpunk) {
+      mjPrompt = `Cyberpunk city street at night, rain-soaked neon-lit alley, holographic advertisements, flying vehicles in background, volumetric fog, cinematic lighting, shot from low angle, ultra-detailed, 8k --ar 16:9 --v 6 --style raw --c 25 --s 200`;
+      klingPrompt = `[Camera] Slow dolly shot forward through rain-lit street, Dutch angle for tension
 [Duration] 10 seconds
-[Visual] Enter custom dimension, blocks materialize from particles, new biomes revealed
-[Lighting] End-like purple ambient, bright portal core
-[Style] Minecraft vanilla + RTX, no UI, 60fps smooth`;
-
-      sunoPrompt = `\
-[Genre] Chiptune / Orchestral Hybrid
-[Mood] Adventurous, magical, discovery
-[Instrument] 8-bit lead melody, full orchestra backing, crystal bell accents
-[Structure] 30s exploration theme, 15s portal activation sting, 30s new dimension reveal
-[Tempo] 140 BPM, upbeat adventure rhythm`;
-
-      variations = [
-        { label: '方案 A（冒险探索风）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt },
-        { label: '方案 B（神秘史诗风）', mj: mjPrompt.replace('vibrant colors', 'dark mythical atmosphere, ancient ruin textures'), kling: klingPrompt.replace('smooth gimbal', 'slow epic reveal'), suno: sunoPrompt.replace('140 BPM', '90 BPM epic orchestral') }
-      ];
+[Visual] Neon signs reflecting in puddles, steam rising from vents, distant flying cars, pedestrians with glowing implants
+[Lighting] Deep blues and magentas, harsh neon sources, volumetric fog
+[Style] Blade Runner aesthetic, film grain, cinematic letterbox`;
+      sunoPrompt = `[Genre] Synthwave / Retrowave
+[Mood] Nostalgic, electric, slightly melancholic
+[Instrument] Analog synths, gated reverb drums, bass synth, occasional vocoder
+[Structure] 30s intro with arpeggios, 60s main theme with evolving pads, 30s outro fade
+[Tempo] 118 BPM, driving rhythm
+[Vocals] Wordless vocal chops or optional female vocals`;
+    } else if (sceneMapping.nature || deepSceneMapping.underwater || deepSceneMapping.jungle) {
+      if (deepSceneMapping.underwater) {
+        mjPrompt = `Deep sea underwater scene, bioluminescent jellyfish colony, rays of light penetrating from surface above, hyper-realistic, National Geographic quality, 8k --ar 16:9 --v 6 --style raw --c 15`;
+        klingPrompt = `[Camera] Slow upward tilt from ocean floor, revealing the bioluminescent world above
+[Duration] 12 seconds
+[Visual] Glowing jellyfish drifting gracefully, particles floating in light beams, mysterious deep sea creatures
+[Lighting] Deep blue gradient, bioluminescent glow, volumetric light rays
+[Style] BBC Blue Planet quality, ethereal, hypnotic`;
+      } else {
+        mjPrompt = `Ancient primeval forest at golden hour, colossal trees with hanging vines, rays of light piercing canopy, moss-covered rocks by crystal stream, fairy tale atmosphere, hyper-detailed, 8k --ar 16:9 --v 6 --style raw --c 20`;
+        klingPrompt = `[Camera] Slow push-in through misty forest, revealing hidden world
+[Duration] 10 seconds
+[Visual] Ancient trees, floating particles in light beams, small stream with smooth stones, occasional wildlife glimpse
+[Lighting] Golden hour, volumetric god rays, soft backlight
+[Style] Studio Ghibli meets Planet Earth, magical realism`;
+      }
+      sunoPrompt = `[Genre] Ambient Nature / Ethereal
+[Mood] Peaceful, awe-inspiring, meditative
+[Instrument] Nature sounds (birds, water, wind), soft piano, ambient synth pads, distant flute
+[Structure] 40s gradual build, 60s main soundscape, 20s gentle fade
+[Tempo] 60 BPM, breathing rhythm
+[Vocals] Optional wordless female vocals`;
+    } else if (sceneMapping.space || keywords.includes('宇宙') || keywords.includes('地球')) {
+      mjPrompt = `Cosmic nebula panorama, stellar nursery with newborn stars, swirling dust clouds in purple and gold, Hubble telescope quality, deep space photography style, 8k --ar 16:9 --v 6 --style raw --c 15`;
+      klingPrompt = `[Camera] Slow zoom out from nebula center, revealing cosmic scale
+[Duration] 15 seconds
+[Visual] Colorful nebula gases, newborn stars twinkling, distant galaxies rotating, cosmic dust particles
+[Lighting] Natural cosmic illumination, no terrestrial light sources
+[Style] NASA visualization, scientifically accurate colors, cinematic`;
+      sunoPrompt = `[Genre] Cinematic Space Ambient
+[Mood] Vast, mysterious, humbling
+[Instrument] Deep sub-bass rumble, shimmering synths, spatial reverb, wordless choir
+[Structure] 60s slow build with layering, 90s peak with full arrangement, 30s fade to silence
+[Tempo] 50 BPM, very slow pulse
+[Vocals] Ethereal choir or wordless vocal textures`;
+    } else if (sceneMapping.fantasy || sceneMapping.history) {
+      mjPrompt = `Epic fantasy battle scene, armored knights on horseback charging across misty battlefield, castle fortress on volcanic mountain, dragons flying overhead, dramatic storm clouds, concept art quality, 8k --ar 16:9 --v 6 --style raw --c 30`;
+      klingPrompt = `[Camera] Epic establishing shot, slow reveal of battlefield scale
+[Duration] 12 seconds
+[Visual] Knight formation charging, banners fluttering, castle in background with lightning, dragons circling above
+[Lighting] Storm lighting, dramatic rim light on figures, volumetric clouds
+[Style] Peter Jackson Lord of the Rings, historical accuracy meets fantasy spectacle`;
+      sunoPrompt = `[Genre] Epic Orchestral / Trailer Music
+[Mood] Grandiose, heroic, climactic
+[Instrument] Full orchestra (strings, brass, percussion), war drums, chanted vocals
+[Structure] 30s tension build, 60s full battle theme, 30s victory fanfare or dramatic cut
+[Tempo] 140 BPM battle rhythm, building to 160 BPM climax
+[Vocals] Male choir chant, wordless soprano climax`;
+    } else if (sceneMapping.horror) {
+      mjPrompt = `Psychological horror scene, abandoned hospital corridor at night, flickering fluorescent lights, shadowy figure at end of hallway, dust particles floating, unsettling atmosphere, film grain, 8k --ar 16:9 --v 6 --style raw --c 35`;
+      klingPrompt = `[Camera] Tracking shot down eerie corridor, POV glimpses
+[Duration] 10 seconds
+[Visual] Flickering lights, shadows moving impossibly, doors creaking open, figure appearing and disappearing
+[Lighting] Harsh fluorescent flicker, deep shadows, occasional supernatural glow
+[Style] Silent Hill meets The Conjuring, dread-inducing, psychological`;
+      sunoPrompt = `[Genre] Horror Soundtrack / Dark Ambient
+[Mood] Dreadful, unsettling, paranoid
+[Instrument] Dissonant strings, metallic scrapes, distorted bass drones, heartbeat bass
+[Structure] 60s gradual tension build, 30s silence, 30s sudden cacophony, unsettling end
+[Tempo] 40 BPM irregular, heartbeat rhythm that accelerates
+[Vocals] Distant whispers, breath sounds, no clear words`;
+    } else if (sceneMapping.anime) {
+      mjPrompt = `Anime style scene, cherry blossom viewing in Kyoto, character with flowing hair looking at distant mountain, Studio Ghibli aesthetic, watercolor background, soft lighting, 8k --ar 16:9 --v 6 --style raw`;
+      klingPrompt = `[Camera] Gentle pan, soft focus transitions
+[Duration] 8 seconds
+[Visual] Falling cherry petals, character in contemplative pose, traditional Japanese garden background
+[Lighting] Soft golden hour, bokeh sakura petals, warm tones
+[Style] Anime cel-shaded, Studio Ghibli quality, watercolor background effect`;
+      sunoPrompt = `[Genre] Anime OST / J-Pop Ballad
+[Mood] Nostalgic, bittersweet, beautiful
+[Instrument] Acoustic guitar, piano, light strings, shakuhachi flute
+[Structure] 30s gentle intro, 60s emotional verse-chorus, 30s soft outro
+[Tempo] 85 BPM, flowing tempo
+[Vocals] Emotional Japanese female vocals, breathy and expressive`;
+    } else if (sceneMapping.scifi || keywords.includes('地球')) {
+      mjPrompt = `Futuristic megacity from orbit, biodome clusters covering continents, space elevator reaching to orbital stations, Earth as backdrop, clean energy visibly flowing, concept art, 8k --ar 16:9 --v 6 --style raw --c 20`;
+      klingPrompt = `[Camera] Slow orbit around Earth, descending through atmosphere to city
+[Duration] 12 seconds
+[Visual] Continental cities in biodomes, orbital infrastructure, natural and artificial coexisting
+[Lighting] Earth reflection, sunrise terminator line, artificial light grids visible
+[Style] Expanse meets Avatar, hopeful future, technological beauty`;
+      sunoPrompt = `[Genre] Sci-Fi Orchestral / Progressive
+[Mood] Hopeful, grand, forward-looking
+[Instrument] Electronic elements (subtle), full orchestra, choral elements
+[Structure] 60s epic build from quiet to full orchestration, 60s main theme
+[Tempo] 100 BPM, building rhythm
+[Vocals] Hopeful choir, mixed with ethereal electronic textures`;
+    } else if (keywords.some(k => ['战斗', '动作', '格斗'].includes(k))) {
+      mjPrompt = `Epic martial arts battle scene, two warriors clashing in mid-air, dynamic action pose, cape flowing dramatically, explosive energy effects, cinematic composition, 8k --ar 16:9 --v 6 --style raw --c 30`;
+      klingPrompt = `[Camera] Dynamic tracking shot, explosive action
+[Duration] 8 seconds
+[Visual] Martial artists in mid-leap, impact effects, debris, dramatic lighting on contact
+[Lighting] Rim light for silhouette, backlit impact flashes
+[Style] John Wick meets Crouching Tiger, grounded but stylized action`;
+      sunoPrompt = `[Genre] Action Trailer / Metal Hybrid
+[Mood] Intense, adrenaline-fueled, unstoppable
+[Instrument] Heavy guitars, pounding drums, orchestral brass stabs, bass drop
+[Structure] 15s tension, 45s full action, 15s hard stop or slowdown
+[Tempo] 180 BPM, double-kick drums
+[Vocals] Aggressive shouts, wordless screams`;
     } else {
-      // 通用模板
-      mjPrompt = `\
-${keywords.join(', ')}, high quality, detailed, professional composition, \
-cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
-
-      klingPrompt = `\
-[Camera] Medium shot, smooth movement
-[Duration] 6 seconds
-[Visual] ${understandResult.summary}
-[Lighting] Natural, balanced
-[Style] Photorealitic, high quality`;
-
-      sunoPrompt = `\
-[Genre] ${keywords.includes('悬疑') || keywords.includes('神秘') ? 'Dark Ambient' : 'Cinematic Pop'}
-[Mood] ${keywords.slice(0, 3).join(', ')}
-[Instrument] Full arrangement
-[Structure] 60s full track
-[Tempo] 120 BPM`;
-
+      // 通用模板 - 基于关键词智能组合
+      const styleKeywords = keywords.slice(0, 4).join(', ');
+      mjPrompt = `${styleKeywords}, highly detailed, professional composition, cinematic lighting, atmospheric depth, 8k resolution, hyper-realistic --ar 16:9 --v 6 --style raw --c 20`;
+      klingPrompt = `[Camera] Medium wide shot, subtle camera movement
+[Duration] 8 seconds
+[Visual] ${styleKeywords} scene, dynamic composition, atmospheric elements
+[Lighting] Cinematic, mood-enhancing
+[Style] Professional production quality, 60fps`;
+      sunoPrompt = `[Genre] Cinematic / Atmospheric
+[Mood] ${styleKeywords}, immersive
+[Instrument] Full arrangement with modern and organic elements
+[Structure] 60s full track with dynamics
+[Tempo] 90-120 BPM, matching scene energy`;
       variations = [
-        { label: '方案 A（标准风格）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt }
+        { label: '方案 A（标准风格）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt },
+        { label: '方案 B（电影质感）', mj: mjPrompt.replace('8k', '8k photorealistic, anamorphic lens flare'), kling: klingPrompt.replace('60fps', 'film grain, anamorphic quality'), suno: sunoPrompt.replace('90-120', '70-85, epic orchestral enhancement') }
+      ];
+      quality = 'A';
+    }
+
+    // 如果没有设置 variations，使用默认方案
+    if (variations.length === 0) {
+      variations = [
+        { label: '方案 A（电影级）', mj: mjPrompt, kling: klingPrompt, suno: sunoPrompt },
+        { label: '方案 B（艺术风格）', mj: mjPrompt.replace('hyper-realistic', 'artistic interpretation, painterly').replace('8k', '4k'), kling: klingPrompt.replace('60fps', 'stylized animation'), suno: sunoPrompt.replace('[Genre]', '[Genre] Ambient / Experimental\n').replace('[Tempo]', '[Tempo] 40% slower, ambient re interpretation\n[Tempo]') }
       ];
     }
 
     return {
       thinking: [
         '📥 接收理解 Agent 的输出...',
-        '🎨 针对 Midjourney 特性生成提示词...',
-        '🎬 针对 Kling 视频模型生成提示词...',
-        '🎵 针对 Suno 音乐模型生成提示词...',
-        '🔄 生成多版本变体...',
+        '🔍 分析创作场景与风格定位...',
+        '🎨 针对 Midjourney 特性生成专业提示词...',
+        '🎬 针对 Kling 视频模型生成镜头描述...',
+        '🎵 针对 Suno 音乐模型生成音频提示词...',
+        '🔄 生成多版本变体方案...',
         '✅ 提示词生成完成'
       ],
       result: {
@@ -151,7 +217,7 @@ cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
         klingPrompt: variations[0].kling,
         sunoPrompt: variations[0].suno,
         variations: variations,
-        quality: 'A+',
+        quality: quality,
         estimatedCost: '~0.15 MJ credits + ~0.5 Kling credits'
       }
     };
@@ -254,8 +320,7 @@ cinematic lighting, 8k resolution --ar 16:9 --v 6 --style raw --c 15`;
   • Suno 提示词可指定歌手音色参考
 
 ═════════════════════════════
-🤖 本报告由 AI Sight 执行 Agent 生成（模拟模式）
-后续接入 MiMo API 后可替换为真实 AI 推理。`
+🤖 本报告由 AI Sight 执行 Agent 生成（模拟模式）`
   },
 
   // ===== 提示词解析器 =====

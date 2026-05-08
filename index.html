@@ -15,6 +15,7 @@
       <span class="logo-sub">多 Agent 提示词工程工作台</span>
     </div>
     <div class="header-actions">
+      <button class="btn btn-ghost" id="btn-history">📜 历史</button>
       <button class="btn btn-ghost" id="btn-howitworks">工作原理</button>
     </div>
   </header>
@@ -187,6 +188,50 @@
 
         <!-- 导入用的隐藏 input -->
         <input type="file" id="file-import" accept=".json" style="display:none">
+      </div>
+
+      <!-- 模板预览弹窗 -->
+      <div class="modal-overlay" id="modal-preview" style="display:none">
+        <div class="modal modal-preview">
+          <div class="modal-header">
+            <h3 id="preview-title">📋 模板预览</h3>
+            <button class="modal-close" id="modal-close-preview">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="preview-meta" id="preview-meta"></div>
+            <div class="preview-section">
+              <div class="preview-label">📝 创作需求 / 提示词</div>
+              <pre class="preview-content" id="preview-content"></pre>
+            </div>
+            <div class="preview-section" id="preview-convert-section" style="display:none">
+              <div class="preview-label">🔄 转换配置</div>
+              <div class="preview-convert-info" id="preview-convert-info"></div>
+            </div>
+            <div class="preview-tags" id="preview-tags"></div>
+            <div class="preview-actions">
+              <button class="btn btn-secondary" id="btn-preview-copy">📋 复制提示词</button>
+              <button class="btn btn-primary" id="btn-preview-use">▶ 使用模板</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 历史记录面板 -->
+      <div class="modal-overlay" id="modal-history" style="display:none">
+        <div class="modal modal-history">
+          <div class="modal-header">
+            <h3>📜 创作历史记录</h3>
+            <div class="history-header-actions">
+              <button class="btn-sm" id="btn-clear-history">🗑️ 清空</button>
+              <button class="modal-close" id="modal-close-history">×</button>
+            </div>
+          </div>
+          <div class="modal-body">
+            <div class="history-list" id="history-list">
+              <div class="history-empty">暂无历史记录</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="preset-prompts" id="presets-generate">
